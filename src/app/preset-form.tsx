@@ -14,11 +14,20 @@ import { useCurrencies } from "@/hooks/useCurrencies";
 import { useCategories } from "@/hooks/useCategories";
 import { useAccounts } from "@/hooks/useAccounts";
 import { colors } from "@/theme/colors";
+import { T } from "@/components/ThemedText";
 import type { PresetInsert } from "@/types/database";
 
 export default function PresetForm() {
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id?: string }>();
+
+  const goBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.navigate("/(app)/presets");
+    }
+  };
   const isEdit = !!id;
 
   const { data: presets } = usePresets();
@@ -71,7 +80,7 @@ export default function PresetForm() {
       } else {
         await addMutation.mutateAsync(data);
       }
-      router.back();
+      goBack();
     } catch (e: any) {
       Alert.alert("Error", e.message);
     } finally {
@@ -86,12 +95,12 @@ export default function PresetForm() {
       keyboardShouldPersistTaps="handled"
     >
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 24 }}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={goBack}>
           <Text style={{ color: colors.muted, fontSize: 14 }}>Cancel</Text>
         </TouchableOpacity>
-        <Text style={{ color: colors.ink, fontSize: 18, fontFamily: "ArchivoBlack" }}>
-          {isEdit ? "Edit" : "New"} Preset
-        </Text>
+        <T variant="title">
+          {isEdit ? "Edit Preset" : "New Preset"}
+        </T>
         <TouchableOpacity onPress={handleSave} disabled={saving}>
           {saving ? (
             <ActivityIndicator color={colors.accent} />
@@ -174,7 +183,7 @@ export default function PresetForm() {
           onPress={() => {
             Alert.alert("Archive", "Archive this preset?", [
               { text: "Cancel", style: "cancel" },
-              { text: "Archive", style: "destructive", onPress: async () => { if (id) { await archiveMutation.mutateAsync(id); router.back(); } } },
+              { text: "Archive", style: "destructive", onPress: async () => { if (id) { await archiveMutation.mutateAsync(id); goBack(); } } },
             ]);
           }}
         >

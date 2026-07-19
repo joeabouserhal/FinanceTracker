@@ -42,6 +42,14 @@ export default function TransactionForm() {
   const { id } = useLocalSearchParams<{ id?: string }>();
   const isEdit = !!id;
 
+  const goBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.navigate("/(app)/transactions");
+    }
+  };
+
   const { data: currencies } = useCurrencies();
   const { data: categories } = useCategories();
   const { data: accounts } = useAccounts();
@@ -184,7 +192,7 @@ export default function TransactionForm() {
       } else {
         await addMutation.mutateAsync(data);
       }
-      router.back();
+      goBack();
     } catch (e: any) {
       showAlert("Error", e.message);
     } finally {
@@ -211,12 +219,12 @@ export default function TransactionForm() {
           backgroundColor: colors.background,
         }}
       >
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={goBack}>
           <T variant="body" style={{ color: colors.muted, fontSize: 14 }}>
             Cancel
           </T>
         </TouchableOpacity>
-        <T variant="heading" style={{ fontSize: 18 }}>
+        <T variant="title">
           {isEdit ? "Edit Transaction" : "New Transaction"}
         </T>
         <TouchableOpacity onPress={handleSave} disabled={saving}>
@@ -510,7 +518,7 @@ export default function TransactionForm() {
           setConfirmVisible(false);
           if (id) {
             await deleteMutation.mutateAsync(id);
-            router.back();
+            goBack();
           }
         }}
         onCancel={() => setConfirmVisible(false)}

@@ -54,7 +54,7 @@ export default function TransactionsList() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ paddingHorizontal: 16, paddingTop: 48, paddingBottom: 8, backgroundColor: colors.background }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 48, paddingBottom: 16, backgroundColor: colors.background }}>
         <T variant="title">Transactions</T>
       </View>
 
@@ -75,7 +75,7 @@ export default function TransactionsList() {
         </ScrollView>
       </View>
 
-      <TouchableOpacity style={{ position: "absolute", bottom: 24, right: 24, zIndex: 10, backgroundColor: colors.accent, width: 56, height: 56, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.accent }} onPress={() => router.push("/(app)/transaction-form")}>
+      <TouchableOpacity style={{ position: "absolute", bottom: 24, right: 24, zIndex: 10, backgroundColor: colors.accent, width: 56, height: 56, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.accent }} onPress={() => router.push("/transaction-form")}>
         <T variant="heading" style={{ color: colors.background, fontSize: 28 }}>+</T>
       </TouchableOpacity>
 
@@ -86,7 +86,7 @@ export default function TransactionsList() {
           {Object.entries(grouped).map(([date, txns]) => (
             <View key={date}>
               <T variant="label" style={{ paddingHorizontal: 16, paddingVertical: 8 }}>{formatDateLabel(date)}</T>
-              {txns.map((t) => <TransactionRow key={t.id} transaction={t} onPress={() => router.push({ pathname: "/(app)/transaction-form", params: { id: t.id } })} />)}
+              {txns.map((t) => <TransactionRow key={t.id} transaction={t} onPress={() => router.push({ pathname: "/transaction-form", params: { id: t.id } })} />)}
             </View>
           ))}
           <View style={{ height: 100 }} />

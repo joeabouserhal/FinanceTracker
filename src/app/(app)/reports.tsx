@@ -22,7 +22,7 @@ export default function Reports() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ paddingHorizontal: 16, paddingTop: 48, paddingBottom: 8, backgroundColor: colors.background }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 48, paddingBottom: 16, backgroundColor: colors.background }}>
         <T variant="title" style={{ marginBottom: 4 }}>Reports</T>
         <T variant="body" style={{ color: colors.muted, fontSize: 14 }}>Spending by category this month</T>
       </View>

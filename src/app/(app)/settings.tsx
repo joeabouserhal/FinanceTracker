@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
-import { View, TextInput, ScrollView, TouchableOpacity, Alert, Modal } from "react-native";
-import { useCurrencies, useAddCurrency, useDeleteCurrency, useSetDefaultCurrency } from "@/hooks/useCurrencies";
-import { useCategories, useAddCategory, useArchiveCategory, useUpdateCategory } from "@/hooks/useCategories";
-import { T } from "@/components/ThemedText";
 import { BrutalistToggle, getBiometricEnabled, setBiometricEnabled } from "@/components/BrutalistToggle";
+import { T } from "@/components/ThemedText";
 import { useAuth } from "@/hooks/useAuth";
+import { useAddCategory, useArchiveCategory, useCategories, useUpdateCategory } from "@/hooks/useCategories";
+import { useAddCurrency, useCurrencies, useDeleteCurrency, useSetDefaultCurrency } from "@/hooks/useCurrencies";
 import { colors } from "@/theme/colors";
+import { useEffect, useState } from "react";
+import { Alert, Modal, ScrollView, TextInput, TouchableOpacity, View } from "react-native";
 
 const PRESET_COLORS = ["#4C9A63", "#E8432E", "#F4C430", "#77746C", "#3B82F6", "#8B5CF6", "#EC4899", "#14B8A6"];
 const S = 16; // base spacing unit
@@ -60,13 +60,13 @@ export default function Settings() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ paddingHorizontal: S, paddingTop: 48, paddingBottom: S / 2, backgroundColor: colors.background }}>
+      <View style={{ paddingHorizontal: S, paddingTop: 48, paddingBottom: S, backgroundColor: colors.background }}>
         <T variant="title">Settings</T>
       </View>
 
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: S }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: S }}>
         {/* Email + Sign Out */}
-        <View style={{ borderBottomWidth: 1, borderBottomColor: "#1A1A1A", paddingVertical: S }}>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: "#1A1A1A", paddingBottom: S }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
             <T variant="body" style={{ fontSize: 14, color: colors.muted }}>{user?.email}</T>
             <TouchableOpacity onPress={signOut} style={{ borderWidth: 2, borderColor: colors.expense, paddingVertical: S / 4, paddingHorizontal: S / 2 }}>

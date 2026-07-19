@@ -1,13 +1,13 @@
-import { useState, useMemo } from "react";
-import { View, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator } from "react-native";
-import { useRouter } from "expo-router";
-import { useTransactions } from "@/hooks/useTransactions";
+import { T } from "@/components/ThemedText";
+import { TransactionRow } from "@/components/TransactionRow";
 import { useCurrencies } from "@/hooks/useCurrencies";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
-import { TransactionRow } from "@/components/TransactionRow";
-import { T } from "@/components/ThemedText";
-import { formatNumber } from "@/utils/currency";
+import { useTransactions } from "@/hooks/useTransactions";
 import { colors } from "@/theme/colors";
+import { formatNumber } from "@/utils/currency";
+import { useRouter } from "expo-router";
+import { useMemo, useState } from "react";
+import { ActivityIndicator, RefreshControl, ScrollView, TouchableOpacity, View } from "react-native";
 
 function monthKey(date: Date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`; }
 function monthLabel(key: string) { const [y, m] = key.split("-").map(Number); return new Date(y, m - 1).toLocaleDateString("en-US", { month: "long", year: "numeric" }); }
@@ -38,8 +38,8 @@ export default function Dashboard() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Sticky Header */}
-      <View style={{ paddingHorizontal: 16, paddingTop: 48, paddingBottom: 8, backgroundColor: colors.background }}>
-        <T variant="heading" style={{ fontSize: 20 }}>Finances</T>
+      <View style={{ paddingHorizontal: 16, paddingTop: 48, paddingBottom: 16, backgroundColor: colors.background }}>
+        <T variant="title">Finances</T>
       </View>
 
       {!isConnected && (
@@ -50,7 +50,7 @@ export default function Dashboard() {
 
       <TouchableOpacity
         style={{ position: "absolute", bottom: 24, right: 24, zIndex: 10, backgroundColor: colors.accent, width: 56, height: 56, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.accent }}
-        onPress={() => router.push("/(app)/transaction-form")}
+        onPress={() => router.push("/transaction-form")}
       >
         <T variant="heading" style={{ color: colors.background, fontSize: 28 }}>+</T>
       </TouchableOpacity>
@@ -60,7 +60,7 @@ export default function Dashboard() {
         refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.accent} colors={[colors.accent]} progressBackgroundColor={colors.background} />}
       >
         {/* Balance */}
-        <View style={{ paddingHorizontal: 16, paddingVertical: 24, borderBottomWidth: 1, borderBottomColor: "#1A1A1A" }}>
+        <View style={{ paddingHorizontal: 16, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: "#1A1A1A" }}>
           <T variant="label" style={{ marginBottom: 12 }}>Balance</T>
           {Object.keys(allTime).length === 0 ? (
             <T variant="body" style={{ color: colors.muted, fontSize: 14 }}>No transactions yet</T>
@@ -111,7 +111,7 @@ export default function Dashboard() {
             <T variant="label">Recent</T>
             <TouchableOpacity onPress={() => router.push("/(app)/transactions")}><T variant="body" style={{ color: colors.accent, fontSize: 12 }}>See All</T></TouchableOpacity>
           </View>
-          {isLoading ? <ActivityIndicator color={colors.accent} style={{ marginTop: 20 }} /> : recentAll.length === 0 ? <T variant="body" style={{ color: colors.muted, paddingHorizontal: 16, fontSize: 14 }}>No transactions yet. Tap Transact to add one.</T> : recentAll.map((t) => <TransactionRow key={t.id} transaction={t} onPress={() => router.push({ pathname: "/(app)/transaction-form", params: { id: t.id } })} />)}
+          {isLoading ? <ActivityIndicator color={colors.accent} style={{ marginTop: 20 }} /> : recentAll.length === 0 ? <T variant="body" style={{ color: colors.muted, paddingHorizontal: 16, fontSize: 14 }}>No transactions yet. Tap Transact to add one.</T> : recentAll.map((t) => <TransactionRow key={t.id} transaction={t} onPress={() => router.push({ pathname: "/transaction-form", params: { id: t.id } })} />)}
         </View>
         <View style={{ height: 80 }} />
       </ScrollView>

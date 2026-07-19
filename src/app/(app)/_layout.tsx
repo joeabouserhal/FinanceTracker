@@ -4,20 +4,8 @@ import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { BiometricGate } from "@/components/BiometricGate";
 import { colors } from "@/theme/colors";
 
-function TabIcon({
-  name,
-  focused,
-}: {
-  name: React.ComponentProps<typeof MaterialCommunityIcons>["name"];
-  focused: boolean;
-}) {
-  return (
-    <MaterialCommunityIcons
-      name={name}
-      size={24}
-      color={focused ? colors.accent : colors.muted}
-    />
-  );
+function TabIcon({ name, focused }: { name: React.ComponentProps<typeof MaterialCommunityIcons>["name"]; focused: boolean }) {
+  return <MaterialCommunityIcons name={name} size={24} color={focused ? colors.accent : colors.muted} />;
 }
 
 export default function AppLayout() {
@@ -38,67 +26,14 @@ export default function AppLayout() {
           },
           tabBarActiveTintColor: colors.accent,
           tabBarInactiveTintColor: colors.muted,
-          tabBarLabelStyle: {
-            fontSize: 10,
-            textTransform: "uppercase",
-            letterSpacing: 0.5,
-            marginTop: 2,
-          },
+          tabBarLabelStyle: { fontFamily: "ArchivoBlack", fontSize: 9 },
         }}
       >
-        <Tabs.Screen
-          name="dashboard"
-          options={{
-            title: "Home",
-            tabBarIcon: ({ focused }) => (
-              <TabIcon name="view-dashboard" focused={focused} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="transactions"
-          options={{
-            title: "Transact",
-            tabBarIcon: ({ focused }) => (
-              <TabIcon name="swap-vertical" focused={focused} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="presets"
-          options={{
-            title: "Presets",
-            tabBarIcon: ({ focused }) => (
-              <TabIcon name="bookmark-multiple" focused={focused} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="settings"
-          options={{
-            title: "Settings",
-            tabBarIcon: ({ focused }) => (
-              <TabIcon name="cog" focused={focused} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="reports"
-          options={{
-            title: "Reports",
-            tabBarIcon: ({ focused }) => (
-              <TabIcon name="chart-bar" focused={focused} />
-            ),
-          }}
-        />
-        <Tabs.Screen
-          name="transaction-form"
-          options={{ href: null, tabBarStyle: { display: "none" } }}
-        />
-        <Tabs.Screen
-          name="preset-form"
-          options={{ href: null, tabBarStyle: { display: "none" } }}
-        />
+        <Tabs.Screen name="dashboard" options={{ title: "Home", tabBarIcon: ({ focused }) => <TabIcon name="view-dashboard" focused={focused} /> }} />
+        <Tabs.Screen name="transactions" options={{ title: "Transact", tabBarIcon: ({ focused }) => <TabIcon name="swap-vertical" focused={focused} /> }} />
+        <Tabs.Screen name="presets" options={{ title: "Presets", tabBarIcon: ({ focused }) => <TabIcon name="bookmark-multiple" focused={focused} /> }} />
+        <Tabs.Screen name="settings" options={{ title: "Settings", tabBarIcon: ({ focused }) => <TabIcon name="cog" focused={focused} /> }} />
+        <Tabs.Screen name="reports" options={{ title: "Reports", tabBarIcon: ({ focused }) => <TabIcon name="chart-bar" focused={focused} /> }} />
       </Tabs>
     </BiometricGate>
   );
