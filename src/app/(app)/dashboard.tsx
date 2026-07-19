@@ -3,6 +3,7 @@ import { View, ScrollView, TouchableOpacity, RefreshControl, ActivityIndicator }
 import { useRouter } from "expo-router";
 import { useTransactions } from "@/hooks/useTransactions";
 import { useCurrencies } from "@/hooks/useCurrencies";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { TransactionRow } from "@/components/TransactionRow";
 import { T } from "@/components/ThemedText";
 import { formatNumber } from "@/utils/currency";
@@ -14,6 +15,7 @@ function monthBounds(key: string) { const [y, m] = key.split("-").map(Number); c
 
 export default function Dashboard() {
   const router = useRouter();
+  const isConnected = useNetworkStatus((s) => s.isConnected);
   const { data: transactions, isLoading, refetch, isFetching } = useTransactions();
   const { data: currencies } = useCurrencies();
   const [viewMonth, setViewMonth] = useState(() => monthKey(new Date()));
@@ -39,6 +41,12 @@ export default function Dashboard() {
       <View style={{ paddingHorizontal: 16, paddingTop: 48, paddingBottom: 8, backgroundColor: colors.background }}>
         <T variant="heading" style={{ fontSize: 20 }}>Finances</T>
       </View>
+
+      {!isConnected && (
+        <View style={{ backgroundColor: colors.accent, paddingVertical: 4, alignItems: "center" }}>
+          <T variant="mono" style={{ color: colors.background, fontSize: 11 }}>OFFLINE — changes saved locally</T>
+        </View>
+      )}
 
       <TouchableOpacity
         style={{ position: "absolute", bottom: 24, right: 24, zIndex: 10, backgroundColor: colors.accent, width: 56, height: 56, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.accent }}

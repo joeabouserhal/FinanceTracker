@@ -113,7 +113,7 @@ export default function TransactionForm() {
         setDate(existing.date);
         setNotes(existing.notes ?? "");
       }
-    }, [isEdit, existing?.id])
+    }, [isEdit, existing?.id, existing?.amount, existing?.type, existing?.category_id, existing?.notes, existing?.date])
   );
 
   const handleAmountChange = (text: string) => {
@@ -300,6 +300,11 @@ export default function TransactionForm() {
 
         {/* Category */}
         <T variant="label">Category</T>
+        {!categories || filteredCategories.length === 0 ? (
+          <T variant="body" style={{ color: colors.muted, fontSize: 12, marginTop: 8, marginBottom: 20 }}>
+            {!categories ? "Loading..." : "No categories for this type. Go to Settings to add one."}
+          </T>
+        ) : (
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -329,6 +334,7 @@ export default function TransactionForm() {
             </TouchableOpacity>
           ))}
         </ScrollView>
+        )}
 
         {/* Currency */}
         <T variant="label">Currency</T>

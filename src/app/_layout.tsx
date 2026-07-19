@@ -2,11 +2,24 @@ import { useEffect } from "react";
 import { useFonts } from "expo-font";
 import * as SplashScreen from "expo-splash-screen";
 import { Slot } from "expo-router";
-import { QueryClientProvider } from "@tanstack/react-query";
-import { queryClient } from "@/lib/query-client";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+import { queryClient, asyncStoragePersister } from "@/lib/query-client";
+import { OfflineSyncProvider } from "@/components/OfflineSyncProvider";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { StatusBar } from "expo-status-bar";
 
 SplashScreen.preventAutoHideAsync();
+
+function AppInit({ children }: { children: React.ReactNode }) {
+  const initialize = useNetworkStatus((s) => s.initialize);
+
+  useEffect(() => {
+    const unsub = initialize();
+    return () => unsub();
+  }, []);
+
+  return <>{children}</>;
+}
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -16,17 +29,22 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    if (fontsLoaded) {
-      SplashScreen.hideAsync();
-    }
+    if (fontsLoaded) SplashScreen.hideAsync();
   }, [fontsLoaded]);
 
   if (!fontsLoaded) return null;
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <StatusBar style="light" />
-      <Slot />
-    </QueryClientProvider>
+    <PersistQueryClientProvider
+      client={queryClient}
+      persistOptions={{ persister: asyncStoragePersister }}
+    >
+      <AppInit>
+        <OfflineSyncProvider>
+          <StatusBar style="light" />
+          <Slot />
+        </OfflineSyncProvider>
+      </AppInit>
+    </PersistQueryClientProvider>
   );
 }
