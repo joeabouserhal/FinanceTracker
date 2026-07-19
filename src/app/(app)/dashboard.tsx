@@ -40,6 +40,13 @@ export default function Dashboard() {
         <T variant="heading" style={{ fontSize: 20 }}>Finances</T>
       </View>
 
+      <TouchableOpacity
+        style={{ position: "absolute", bottom: 24, right: 24, zIndex: 10, backgroundColor: colors.accent, width: 56, height: 56, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.accent }}
+        onPress={() => router.push("/(app)/transaction-form")}
+      >
+        <T variant="heading" style={{ color: colors.background, fontSize: 28 }}>+</T>
+      </TouchableOpacity>
+
       <ScrollView
         style={{ flex: 1 }}
         refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.accent} colors={[colors.accent]} progressBackgroundColor={colors.background} />}
@@ -60,10 +67,10 @@ export default function Dashboard() {
         </View>
 
         {/* Month Navigator */}
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: "#1A1A1A" }}>
-          <TouchableOpacity onPress={goToPrevMonth} style={{ padding: 8 }}><T variant="heading" style={{ color: colors.muted, fontSize: 18 }}>←</T></TouchableOpacity>
-          <T variant="heading" style={{ fontSize: 16, color: colors.ink }}>{monthLabel(viewMonth)}</T>
-          <TouchableOpacity onPress={goToNextMonth} style={{ padding: 8 }} disabled={isCurrentMonth}><T variant="heading" style={{ color: isCurrentMonth ? "#1A1A1A" : colors.muted, fontSize: 18 }}>→</T></TouchableOpacity>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#1A1A1A" }}>
+          <TouchableOpacity onPress={goToPrevMonth} style={{ padding: 4 }}><T variant="heading" style={{ color: colors.muted, fontSize: 18 }}>←</T></TouchableOpacity>
+          <T variant="heading" style={{ fontSize: 14, color: colors.ink }}>{monthLabel(viewMonth)}</T>
+          <TouchableOpacity onPress={goToNextMonth} style={{ padding: 4 }} disabled={isCurrentMonth}><T variant="heading" style={{ color: isCurrentMonth ? "#1A1A1A" : colors.muted, fontSize: 18 }}>→</T></TouchableOpacity>
         </View>
 
         {/* Month Activity */}
@@ -96,9 +103,9 @@ export default function Dashboard() {
             <T variant="label">Recent</T>
             <TouchableOpacity onPress={() => router.push("/(app)/transactions")}><T variant="body" style={{ color: colors.accent, fontSize: 12 }}>See All</T></TouchableOpacity>
           </View>
-          {isLoading ? <ActivityIndicator color={colors.accent} style={{ marginTop: 20 }} /> : recentAll.length === 0 ? <T variant="body" style={{ color: colors.muted, paddingHorizontal: 16, fontSize: 14 }}>No transactions yet. Tap Transact to add one.</T> : recentAll.map((t) => <TransactionRow key={t.id} transaction={t} />)}
+          {isLoading ? <ActivityIndicator color={colors.accent} style={{ marginTop: 20 }} /> : recentAll.length === 0 ? <T variant="body" style={{ color: colors.muted, paddingHorizontal: 16, fontSize: 14 }}>No transactions yet. Tap Transact to add one.</T> : recentAll.map((t) => <TransactionRow key={t.id} transaction={t} onPress={() => router.push({ pathname: "/(app)/transaction-form", params: { id: t.id } })} />)}
         </View>
-        <View style={{ height: 40 }} />
+        <View style={{ height: 80 }} />
       </ScrollView>
     </View>
   );

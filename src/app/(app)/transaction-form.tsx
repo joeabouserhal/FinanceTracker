@@ -1,14 +1,12 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import {
   View,
-  Text,
   TextInput,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useCurrencies } from "@/hooks/useCurrencies";
 import { useCategories } from "@/hooks/useCategories";
 import { useAccounts } from "@/hooks/useAccounts";
@@ -19,11 +17,24 @@ import {
   useDeleteTransaction,
   useTransactions,
 } from "@/hooks/useTransactions";
+import { T } from "@/components/ThemedText";
+import { ThemedAlert, ThemedConfirm } from "@/components/ThemedAlert";
 import { colors } from "@/theme/colors";
 import type { TransactionInsert } from "@/types/database";
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function addCommas(val: string): string {
+  if (!val) return "";
+  const negative = val.startsWith("-");
+  const cleaned = (negative ? val.slice(1) : val).replace(/,/g, "");
+  if (!cleaned) return negative ? "-" : "";
+  const [int, frac] = cleaned.split(".");
+  const withCommas = int.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const result = frac !== undefined ? `${withCommas}.${frac}` : withCommas;
+  return negative ? `-${result}` : result;
 }
 
 export default function TransactionForm() {
@@ -46,8 +57,11 @@ export default function TransactionForm() {
     existing?.type ?? "expense",
   );
   const [amount, setAmount] = useState(
-    existing ? String(existing.amount / 100) : "",
+    existing ? addCommas(String(existing.amount / 100)) : "",
   );
+  const amountRef = useRef<TextInput>(null);
+  const cursorPos = useRef(0);
+
   const [currencyId, setCurrencyId] = useState(
     existing?.currency_id ?? currencies?.find((c) => c.is_default)?.id ?? "",
   );
@@ -56,32 +70,99 @@ export default function TransactionForm() {
   const [date, setDate] = useState(existing?.date ?? todayISO());
   const [notes, setNotes] = useState(existing?.notes ?? "");
   const [saving, setSaving] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
+  const [confirmVisible, setConfirmVisible] = useState(false);
+
+  const showAlert = (title: string, message: string) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertVisible(true);
+  };
 
   const filteredCategories =
     categories?.filter((c) => c.type === type) ?? [];
+
+  const handleTypeChange = (t: "income" | "expense") => {
+    setType(t);
+    // Clear category if the selected one doesn't match the new type
+    const selectedCat = categories?.find((c) => c.id === categoryId);
+    if (selectedCat && selectedCat.type !== t) {
+      setCategoryId("");
+    }
+  };
+
+  const activeAccounts = accounts?.filter((a) => !a.archived) ?? [];
+  const activeCurrency = currencies?.find((c) => c.id === currencyId);
+
+  // Reset form when opening a new transaction, populate when editing
+  useFocusEffect(
+    useCallback(() => {
+      if (!isEdit) {
+        setAmount("");
+        setCategoryId("");
+        setAccountId("");
+        setNotes("");
+      } else if (existing) {
+        setAmount(addCommas(String(existing.amount / 100)));
+        setType(existing.type);
+        setCurrencyId(existing.currency_id);
+        setCategoryId(existing.category_id);
+        setAccountId(existing.account_id ?? "");
+        setDate(existing.date);
+        setNotes(existing.notes ?? "");
+      }
+    }, [isEdit, existing?.id])
+  );
+
+  const handleAmountChange = (text: string) => {
+    // Count commas before cursor in old value
+    const oldText = amount;
+    const oldCursor = cursorPos.current;
+    const commasBeforeCursorOld = (oldText.slice(0, oldCursor).match(/,/g) || []).length;
+
+    // Format new text
+    const formatted = addCommas(text);
+
+    // Count commas before cursor in new value
+    // The cursor should be at: oldCursor - commasRemoved + commasAdded
+    // Since we pass through addCommas, we can estimate:
+    const adjusted = oldCursor + (formatted.length - oldText.length);
+
+    setAmount(formatted);
+
+    // Restore cursor after render
+    setTimeout(() => {
+      const newCursor = Math.min(Math.max(0, adjusted), formatted.length);
+      amountRef.current?.setNativeProps({
+        selection: { start: newCursor, end: newCursor },
+      });
+    }, 0);
+  };
+
+  const getRawAmount = () => parseFloat(amount.replace(/,/g, "")) || 0;
 
   const applyPreset = (presetId: string) => {
     const p = presets?.find((pr) => pr.id === presetId);
     if (!p) return;
     setType(p.type);
-    if (p.default_amount != null) setAmount(String(p.default_amount / 100));
+    if (p.default_amount != null) setAmount(addCommas(String(p.default_amount / 100)));
     if (p.default_currency_id) setCurrencyId(p.default_currency_id);
     if (p.default_category_id) setCategoryId(p.default_category_id);
     if (p.default_account_id) setAccountId(p.default_account_id);
   };
 
   const handleSave = async () => {
-    if (!amount || !currencyId || !categoryId) {
-      Alert.alert(
-        "Missing fields",
-        "Amount, currency, and category are required.",
-      );
+    const rawAmount = getRawAmount();
+    if (!rawAmount || !currencyId || !categoryId) {
+      showAlert("Missing fields", "Amount, currency, and category are required.");
       return;
     }
 
-    const amountCents = Math.round(parseFloat(amount) * 100);
+    const amountCents = Math.round(rawAmount * 100);
     if (isNaN(amountCents) || amountCents <= 0) {
-      Alert.alert("Invalid amount", "Enter a valid positive amount.");
+      showAlert("Invalid amount", "Enter a valid positive amount.");
       return;
     }
 
@@ -105,7 +186,7 @@ export default function TransactionForm() {
       }
       router.back();
     } catch (e: any) {
-      Alert.alert("Error", e.message);
+      showAlert("Error", e.message);
     } finally {
       setSaving(false);
     }
@@ -113,51 +194,37 @@ export default function TransactionForm() {
 
   const handleDelete = () => {
     if (!id) return;
-    Alert.alert("Delete", "Remove this transaction?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          await deleteMutation.mutateAsync(id);
-          router.back();
-        },
-      },
-    ]);
+    setConfirmVisible(true);
   };
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: colors.background }}
-      contentContainerStyle={{ padding: 16, paddingTop: 48 }}
-      keyboardShouldPersistTaps="handled"
-    >
-      {/* Header */}
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* Sticky Header */}
       <View
         style={{
           flexDirection: "row",
           justifyContent: "space-between",
           alignItems: "center",
-          marginBottom: 24,
+          paddingHorizontal: 16,
+          paddingTop: 48,
+          paddingBottom: 12,
+          backgroundColor: colors.background,
         }}
       >
         <TouchableOpacity onPress={() => router.back()}>
-          <Text style={{ color: colors.muted, fontSize: 14 }}>Cancel</Text>
+          <T variant="body" style={{ color: colors.muted, fontSize: 14 }}>
+            Cancel
+          </T>
         </TouchableOpacity>
-        <Text
-          style={{
-            color: colors.ink,
-            fontSize: 18,
-            fontFamily: "ArchivoBlack",
-          }}
-        >
-          {isEdit ? "Edit" : "New"} Transaction
-        </Text>
+        <T variant="heading" style={{ fontSize: 18 }}>
+          {isEdit ? "Edit Transaction" : "New Transaction"}
+        </T>
         <TouchableOpacity onPress={handleSave} disabled={saving}>
           {saving ? (
             <ActivityIndicator color={colors.accent} />
           ) : (
-            <Text
+            <T
+              variant="body"
               style={{
                 color: colors.accent,
                 fontSize: 14,
@@ -165,211 +232,297 @@ export default function TransactionForm() {
               }}
             >
               Save
-            </Text>
+            </T>
           )}
         </TouchableOpacity>
       </View>
 
-      {/* Preset picker (new transactions only) */}
-      {!isEdit && presets && presets.length > 0 && (
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingHorizontal: 16 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Type toggle — full width, top */}
+        <View style={{ flexDirection: "row", marginBottom: 16, paddingTop: 8 }}>
+          {(["expense", "income"] as const).map((t) => (
+            <TouchableOpacity
+              key={t}
+              onPress={() => handleTypeChange(t)}
+              style={{
+                flex: 1,
+                borderWidth: 2,
+                borderColor: type === t ? (t === "income" ? colors.income : colors.expense) : colors.muted,
+                backgroundColor: type === t ? (t === "income" ? colors.income : colors.expense) : "transparent",
+                paddingVertical: 10,
+                alignItems: "center",
+                marginRight: t === "expense" ? 4 : 0,
+                marginLeft: t === "income" ? 4 : 0,
+              }}
+            >
+              <T variant="body" style={{ color: type === t ? colors.background : colors.muted, fontSize: 14, textTransform: "uppercase", fontWeight: "700" }}>
+                {t}
+              </T>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Preset picker (new transactions only) */}
+        {!isEdit && presets && presets.length > 0 && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
+            {presets.map((p) => (
+              <TouchableOpacity key={p.id} onPress={() => applyPreset(p.id)} style={chipStyle(false)}>
+                <T variant="label" style={{ color: colors.muted, fontSize: 12 }}>{p.name}</T>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+
+        {/* Amount — Hero */}
+        <View style={{ borderTopWidth: 1, borderBottomWidth: 1, borderColor: "#1A1A1A", paddingVertical: 20, marginBottom: 20 }}>
+          <View style={{ flexDirection: "row", alignItems: "baseline" }}>
+            <T variant="mono" style={{ fontSize: 18, color: "#444", marginRight: 6 }}>
+              {activeCurrency?.symbol ?? "$"}
+            </T>
+            <TextInput
+              ref={amountRef}
+              style={{ color: "#F5F1E8", fontSize: 48, fontFamily: "IBMPlexMono", flex: 1, padding: 0 }}
+              placeholder="0"
+              placeholderTextColor="#333"
+              keyboardType="numeric"
+              value={amount}
+              onChangeText={handleAmountChange}
+              onSelectionChange={(e) => {
+                cursorPos.current = e.nativeEvent.selection.start;
+              }}
+            />
+          </View>
+        </View>
+
+        {/* Category */}
+        <T variant="label">Category</T>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={{ marginBottom: 16 }}
+          style={{ marginTop: 8, marginBottom: 20 }}
         >
-          {presets.map((p) => (
+          {filteredCategories.map((c) => (
             <TouchableOpacity
-              key={p.id}
-              onPress={() => applyPreset(p.id)}
-              style={{
-                borderWidth: 2,
-                borderColor: colors.muted,
-                paddingHorizontal: 14,
-                paddingVertical: 6,
-                marginRight: 8,
-              }}
+              key={c.id}
+              onPress={() => setCategoryId(c.id)}
+              style={[
+                chipStyle(categoryId === c.id),
+                categoryId === c.id && c.color
+                  ? { borderColor: c.color, backgroundColor: c.color }
+                  : {},
+              ]}
             >
-              <Text style={{ color: colors.muted, fontSize: 12, textTransform: "uppercase" }}>
-                {p.name}
-              </Text>
+              <T
+                variant="label"
+                style={{
+                  color:
+                    categoryId === c.id ? colors.background : colors.muted,
+                  fontSize: 13,
+                }}
+              >
+                {c.name}
+              </T>
             </TouchableOpacity>
           ))}
         </ScrollView>
-      )}
 
-      {/* Type toggle */}
-      <View style={{ flexDirection: "row", marginBottom: 20 }}>
-        {(["expense", "income"] as const).map((t) => (
-          <TouchableOpacity
-            key={t}
-            onPress={() => setType(t)}
-            style={{
-              flex: 1,
-              borderWidth: 2,
-              borderColor:
-                type === t
-                  ? t === "income"
-                    ? colors.income
-                    : colors.expense
-                  : colors.muted,
-              backgroundColor:
-                type === t
-                  ? t === "income"
-                    ? colors.income
-                    : colors.expense
-                  : "transparent",
-              paddingVertical: 10,
-              alignItems: "center",
-              marginRight: t === "expense" ? 4 : 0,
-              marginLeft: t === "income" ? 4 : 0,
-            }}
-          >
-            <Text
-              style={{
-                color: type === t ? colors.background : colors.muted,
-                fontSize: 14,
-                textTransform: "uppercase",
-                fontWeight: "700",
-              }}
-            >
-              {t}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Amount */}
-      <Text style={s.label}>Amount</Text>
-      <TextInput
-        style={s.input}
-        placeholder="0.00"
-        placeholderTextColor={colors.muted}
-        keyboardType="decimal-pad"
-        value={amount}
-        onChangeText={setAmount}
-      />
-
-      {/* Currency */}
-      <Text style={[s.label, { marginTop: 16 }]}>Currency</Text>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-        {currencies?.map((c) => (
-          <TouchableOpacity
-            key={c.id}
-            onPress={() => setCurrencyId(c.id)}
-            style={chipStyle(currencyId === c.id)}
-          >
-            <Text style={chipTextStyle(currencyId === c.id)}>{c.code}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      {/* Category */}
-      <Text style={[s.label, { marginTop: 16 }]}>Category</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-        {filteredCategories.map((c) => (
-          <TouchableOpacity
-            key={c.id}
-            onPress={() => setCategoryId(c.id)}
-            style={[
-              chipStyle(categoryId === c.id),
-              categoryId === c.id && c.color
-                ? { borderColor: c.color, backgroundColor: c.color }
-                : {},
-            ]}
-          >
-            <Text style={chipTextStyle(categoryId === c.id)}>{c.name}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Account */}
-      <Text style={[s.label, { marginTop: 16 }]}>Account (optional)</Text>
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-        <TouchableOpacity
-          onPress={() => setAccountId("")}
-          style={chipStyle(!accountId)}
+        {/* Currency */}
+        <T variant="label">Currency</T>
+        <View
+          style={{
+            flexDirection: "row",
+            flexWrap: "wrap",
+            gap: 8,
+            marginTop: 8,
+            marginBottom: 20,
+          }}
         >
-          <Text style={chipTextStyle(!accountId)}>None</Text>
-        </TouchableOpacity>
-        {accounts
-          ?.filter((a) => !a.archived)
-          .map((a) => (
+          {currencies?.map((c) => (
             <TouchableOpacity
-              key={a.id}
-              onPress={() => setAccountId(a.id)}
-              style={chipStyle(accountId === a.id)}
+              key={c.id}
+              onPress={() => setCurrencyId(c.id)}
+              style={chipStyle(currencyId === c.id)}
             >
-              <Text style={chipTextStyle(accountId === a.id)}>{a.name}</Text>
+              <T
+                variant="label"
+                style={{
+                  color:
+                    currencyId === c.id ? colors.background : colors.muted,
+                  fontSize: 13,
+                }}
+              >
+                {c.code}
+              </T>
             </TouchableOpacity>
           ))}
-      </View>
+        </View>
 
-      {/* Date */}
-      <Text style={[s.label, { marginTop: 16 }]}>Date</Text>
-      <TextInput
-        style={s.input}
-        placeholder="YYYY-MM-DD"
-        placeholderTextColor={colors.muted}
-        value={date}
-        onChangeText={setDate}
-      />
-
-      {/* Notes */}
-      <Text style={[s.label, { marginTop: 16 }]}>Notes (optional)</Text>
-      <TextInput
-        style={[s.input, { minHeight: 60 }]}
-        placeholder="What was this for?"
-        placeholderTextColor={colors.muted}
-        multiline
-        value={notes}
-        onChangeText={setNotes}
-      />
-
-      {isEdit && (
-        <TouchableOpacity
+        {/* Account */}
+        <T variant="label">Account</T>
+        <View
           style={{
-            borderWidth: 2,
-            borderColor: colors.expense,
-            paddingVertical: 12,
-            alignItems: "center",
-            marginTop: 32,
+            flexDirection: "row",
+            flexWrap: "wrap",
+            gap: 8,
+            marginTop: 8,
+            marginBottom: 20,
           }}
-          onPress={handleDelete}
         >
-          <Text
-            style={{
-              color: colors.expense,
-              textTransform: "uppercase",
-              fontSize: 14,
-            }}
-          >
-            Delete Transaction
-          </Text>
-        </TouchableOpacity>
-      )}
+          {activeAccounts.length === 0 ? (
+            <T
+              variant="body"
+              style={{ color: colors.muted, fontSize: 12 }}
+            >
+              No accounts — go to Settings to add one
+            </T>
+          ) : (
+            <>
+              <TouchableOpacity
+                onPress={() => setAccountId("")}
+                style={chipStyle(!accountId)}
+              >
+                <T
+                  variant="label"
+                  style={{
+                    color: !accountId ? colors.background : colors.muted,
+                    fontSize: 13,
+                  }}
+                >
+                  None
+                </T>
+              </TouchableOpacity>
+              {activeAccounts.map((a) => (
+                <TouchableOpacity
+                  key={a.id}
+                  onPress={() => setAccountId(a.id)}
+                  style={chipStyle(accountId === a.id)}
+                >
+                  <T
+                    variant="label"
+                    style={{
+                      color:
+                        accountId === a.id
+                          ? colors.background
+                          : colors.muted,
+                      fontSize: 13,
+                    }}
+                  >
+                    {a.name}
+                  </T>
+                </TouchableOpacity>
+              ))}
+            </>
+          )}
+        </View>
 
-      <View style={{ height: 60 }} />
-    </ScrollView>
+        {/* Divider */}
+        <View
+          style={{
+            height: 1,
+            backgroundColor: "#1A1A1A",
+            marginBottom: 20,
+          }}
+        />
+
+        {/* Date */}
+        <T variant="label">Date</T>
+        <TextInput
+          style={inputStyle}
+          placeholder="YYYY-MM-DD"
+          placeholderTextColor={colors.muted}
+          value={date}
+          onChangeText={setDate}
+        />
+
+        {/* Notes */}
+        <T variant="label" style={{ marginTop: 16 }}>
+          Notes
+        </T>
+        <TextInput
+          style={[inputStyle, { minHeight: 60, marginTop: 8 }]}
+          placeholder="What was this for?"
+          placeholderTextColor={colors.muted}
+          multiline
+          value={notes}
+          onChangeText={setNotes}
+        />
+
+        {/* Delete (edit only) */}
+        {isEdit && (
+          <>
+            <View
+              style={{
+                height: 1,
+                backgroundColor: "#1A1A1A",
+                marginTop: 32,
+                marginBottom: 16,
+              }}
+            />
+            <TouchableOpacity
+              onPress={handleDelete}
+              style={{
+                borderWidth: 2,
+                borderColor: colors.expense,
+                paddingVertical: 12,
+                alignItems: "center",
+              }}
+            >
+              <T
+                variant="body"
+                style={{
+                  color: colors.expense,
+                  textTransform: "uppercase",
+                  fontSize: 14,
+                }}
+              >
+                Delete
+              </T>
+            </TouchableOpacity>
+          </>
+        )}
+
+        <View style={{ height: 60 }} />
+      </ScrollView>
+
+      <ThemedAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        onDismiss={() => setAlertVisible(false)}
+      />
+      <ThemedConfirm
+        visible={confirmVisible}
+        title="Delete"
+        message="Remove this transaction?"
+        confirmLabel="Delete"
+        destructive
+        onConfirm={async () => {
+          setConfirmVisible(false);
+          if (id) {
+            await deleteMutation.mutateAsync(id);
+            router.back();
+          }
+        }}
+        onCancel={() => setConfirmVisible(false)}
+      />
+    </View>
   );
 }
 
-const s = {
-  label: {
-    color: "#F5F1E8",
-    fontSize: 12,
-    marginBottom: 6,
-    textTransform: "uppercase" as const,
-    letterSpacing: 1,
-  },
-  input: {
-    backgroundColor: "#0A0A0A",
-    borderWidth: 2,
-    borderColor: "#77746C",
-    color: "#F5F1E8",
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    fontSize: 16,
-  },
+const inputStyle = {
+  backgroundColor: "#0A0A0A",
+  borderWidth: 2,
+  borderColor: "#77746C",
+  color: "#F5F1E8",
+  paddingHorizontal: 14,
+  paddingVertical: 12,
+  fontSize: 16,
+  fontFamily: "IBMPlexSans",
+  marginTop: 8,
 };
 
 function chipStyle(active: boolean) {
@@ -379,13 +532,6 @@ function chipStyle(active: boolean) {
     backgroundColor: active ? colors.accent : "transparent",
     paddingHorizontal: 14,
     paddingVertical: 6,
-  };
-}
-
-function chipTextStyle(active: boolean) {
-  return {
-    color: active ? colors.background : colors.muted,
-    fontSize: 13,
-    textTransform: "uppercase" as const,
+    marginRight: 8,
   };
 }
