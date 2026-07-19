@@ -1,26 +1,26 @@
-import { useState, useRef, useCallback } from "react";
-import {
-  View,
-  TextInput,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-} from "react-native";
-import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
-import { useCurrencies } from "@/hooks/useCurrencies";
-import { useCategories } from "@/hooks/useCategories";
+import { ThemedAlert, ThemedConfirm } from "@/components/ThemedAlert";
+import { T } from "@/components/ThemedText";
 import { useAccounts } from "@/hooks/useAccounts";
+import { useCategories } from "@/hooks/useCategories";
+import { useCurrencies } from "@/hooks/useCurrencies";
 import { usePresets } from "@/hooks/usePresets";
 import {
   useAddTransaction,
-  useUpdateTransaction,
   useDeleteTransaction,
   useTransactions,
+  useUpdateTransaction,
 } from "@/hooks/useTransactions";
-import { T } from "@/components/ThemedText";
-import { ThemedAlert, ThemedConfirm } from "@/components/ThemedAlert";
 import { colors } from "@/theme/colors";
 import type { TransactionInsert } from "@/types/database";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
+import { useCallback, useRef, useState } from "react";
+import {
+  ActivityIndicator,
+  ScrollView,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 function todayISO(): string {
   return new Date().toISOString().slice(0, 10);
@@ -286,7 +286,7 @@ export default function TransactionForm() {
         )}
 
         {/* Amount — Hero */}
-        <View style={{ borderTopWidth: 1, borderBottomWidth: 1, borderColor: "#1A1A1A", paddingVertical: 20, marginBottom: 20 }}>
+        <View style={{ borderTopWidth: 1, borderBottomWidth: 1, borderColor: "#1A1A1A", paddingBottom: 16, paddingTop: 12, marginBottom: 16 }}>
           <View style={{ flexDirection: "row", alignItems: "baseline" }}>
             <T variant="mono" style={{ fontSize: 18, color: "#444", marginRight: 6 }}>
               {activeCurrency?.symbol ?? "$"}
@@ -304,6 +304,37 @@ export default function TransactionForm() {
               }}
             />
           </View>
+        </View>
+
+        {/* Currency */}
+        <T variant="label">Currency</T>
+        <View
+          style={{
+            flexDirection: "row",
+            flexWrap: "wrap",
+            gap: 8,
+            marginTop: 8,
+            marginBottom: 20,
+          }}
+        >
+          {currencies?.map((c) => (
+            <TouchableOpacity
+              key={c.id}
+              onPress={() => setCurrencyId(c.id)}
+              style={chipStyle(currencyId === c.id)}
+            >
+              <T
+                variant="label"
+                style={{
+                  color:
+                    currencyId === c.id ? colors.background : colors.muted,
+                  fontSize: 13,
+                }}
+              >
+                {c.code}
+              </T>
+            </TouchableOpacity>
+          ))}
         </View>
 
         {/* Category */}
@@ -343,37 +374,6 @@ export default function TransactionForm() {
           ))}
         </ScrollView>
         )}
-
-        {/* Currency */}
-        <T variant="label">Currency</T>
-        <View
-          style={{
-            flexDirection: "row",
-            flexWrap: "wrap",
-            gap: 8,
-            marginTop: 8,
-            marginBottom: 20,
-          }}
-        >
-          {currencies?.map((c) => (
-            <TouchableOpacity
-              key={c.id}
-              onPress={() => setCurrencyId(c.id)}
-              style={chipStyle(currencyId === c.id)}
-            >
-              <T
-                variant="label"
-                style={{
-                  color:
-                    currencyId === c.id ? colors.background : colors.muted,
-                  fontSize: 13,
-                }}
-              >
-                {c.code}
-              </T>
-            </TouchableOpacity>
-          ))}
-        </View>
 
         {/* Account */}
         <T variant="label">Account</T>

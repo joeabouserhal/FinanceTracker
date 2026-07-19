@@ -90,15 +90,12 @@ export default function Dashboard() {
             Object.values(currencyTotals).map((c) => (
               <View key={c.code} style={{ marginBottom: 12 }}>
                 <View style={{ flexDirection: "row", height: 24, marginBottom: 4 }}>
-                  {c.income > 0 && <View style={{ flex: c.income, backgroundColor: colors.income, height: "100%", justifyContent: "center", paddingHorizontal: 6 }}><T variant="mono" style={{ color: colors.background, fontSize: 11 }}>+{c.symbol}{formatNumber(c.income / 100, 0)}</T></View>}
-                  {c.expense > 0 && <View style={{ flex: c.expense, backgroundColor: colors.expense, height: "100%", justifyContent: "center", alignItems: "flex-end", paddingHorizontal: 6 }}><T variant="mono" style={{ color: colors.background, fontSize: 11 }}>-{c.symbol}{formatNumber(c.expense / 100, 0)}</T></View>}
+                  {c.income > 0 && <View style={{ flex: c.income, backgroundColor: colors.income, height: "100%", justifyContent: "center", paddingHorizontal: 6 }}><T variant="mono" style={{ color: colors.background, fontSize: 11 }}>{Math.round(c.income / (c.income + c.expense) * 100)}%</T></View>}
+                  {c.expense > 0 && <View style={{ flex: c.expense, backgroundColor: colors.expense, height: "100%", justifyContent: "center", alignItems: "flex-end", paddingHorizontal: 6 }}><T variant="mono" style={{ color: colors.background, fontSize: 11 }}>{Math.round(c.expense / (c.income + c.expense) * 100)}%</T></View>}
                 </View>
                 <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                  <View style={{ flexDirection: "row", gap: 12 }}>
-                    <T variant="mono" style={{ color: colors.income, fontSize: 12 }}>+{c.symbol}{formatNumber(c.income / 100, 2)}</T>
-                    <T variant="mono" style={{ color: colors.expense, fontSize: 12 }}>-{c.symbol}{formatNumber(c.expense / 100, 2)}</T>
-                  </View>
-                  <T variant="mono" style={{ fontSize: 12, color: (c.income - c.expense) >= 0 ? colors.income : colors.expense }}>{(c.income - c.expense) >= 0 ? "+" : ""}{c.symbol}{formatNumber(Math.abs(c.income - c.expense) / 100, 2)}</T>
+                  <T variant="mono" style={{ color: colors.income, fontSize: 12 }}>+{c.symbol}{formatNumber(c.income / 100, 2)}</T>
+                  <T variant="mono" style={{ color: colors.expense, fontSize: 12 }}>-{c.symbol}{formatNumber(c.expense / 100, 2)}</T>
                 </View>
               </View>
             ))
