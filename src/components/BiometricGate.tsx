@@ -1,54 +1,67 @@
 import { useState, useEffect, type ReactNode } from "react";
 import { View, TouchableOpacity, AppState } from "react-native";
 import * as LocalAuthentication from "expo-local-authentication";
+import { getBiometricEnabled } from "@/components/BrutalistToggle";
 import { T } from "@/components/ThemedText";
 import { colors } from "@/theme/colors";
 
-interface Props { children: ReactNode; }
+interface Props { children: ReactNode }
 
 export function BiometricGate({ children }: Props) {
   const [unlocked, setUnlocked] = useState(false);
+  const [enabled, setEnabled] = useState(true);
   const [checking, setChecking] = useState(true);
-  const [hasBiometrics, setHasBiometrics] = useState(false);
-
-  const authenticate = async () => {
-    setChecking(true);
-    try {
-      const result = await LocalAuthentication.authenticateAsync({ promptMessage: "Unlock Finance Tracker", fallbackLabel: "Use passcode" });
-      if (result.success) setUnlocked(true);
-    } catch {}
-    setChecking(false);
-  };
 
   useEffect(() => {
     (async () => {
-      const compatible = await LocalAuthentication.hasHardwareAsync();
+      const biometricOn = await getBiometricEnabled();
+      setEnabled(biometricOn);
+      if (!biometricOn) { setUnlocked(true); setChecking(false); return; }
+
+      const hw = await LocalAuthentication.hasHardwareAsync();
       const enrolled = await LocalAuthentication.isEnrolledAsync();
-      if (compatible && enrolled) { setHasBiometrics(true); await authenticate(); }
-      else setUnlocked(true);
+      if (!hw || !enrolled) { setUnlocked(true); setChecking(false); return; }
+
+      const result = await LocalAuthentication.authenticateAsync({ promptMessage: "Unlock Finance Tracker" });
+      setUnlocked(result.success);
+      setChecking(false);
     })();
   }, []);
 
   useEffect(() => {
-    const sub = AppState.addEventListener("change", (nextState) => {
-      if (nextState === "background" && hasBiometrics) setUnlocked(false);
-      else if (nextState === "active" && hasBiometrics && !unlocked) authenticate();
+    const sub = AppState.addEventListener("change", async (state) => {
+      if (state === "active" && unlocked) {
+        const biometricOn = await getBiometricEnabled();
+        if (!biometricOn) return;
+        const enrolled = await LocalAuthentication.isEnrolledAsync();
+        if (!enrolled) return;
+        setUnlocked(false);
+        const result = await LocalAuthentication.authenticateAsync({ promptMessage: "Unlock Finance Tracker" });
+        setUnlocked(result.success);
+      }
     });
     return () => sub.remove();
-  }, [hasBiometrics, unlocked]);
+  }, [unlocked]);
 
-  if (unlocked) return <>{children}</>;
-
-  return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: colors.background, padding: 24 }}>
-      <T variant="heading" style={{ fontSize: 24, marginBottom: 8 }}>Locked</T>
-      <T variant="body" style={{ color: colors.muted, fontSize: 14, textAlign: "center", marginBottom: 24 }}>Authenticate to access your finances</T>
-      <TouchableOpacity onPress={authenticate} disabled={checking}
-        style={{ borderWidth: 2, borderColor: colors.accent, paddingVertical: 14, paddingHorizontal: 48, backgroundColor: checking ? "transparent" : colors.accent }}>
-        <T variant="body" style={{ color: checking ? colors.accent : colors.background, fontSize: 16, textTransform: "uppercase", fontWeight: "700" }}>
-          {checking ? "Authenticating..." : "Unlock"}
-        </T>
-      </TouchableOpacity>
-    </View>
-  );
+  if (checking || !unlocked) {
+    const locked = !checking && !unlocked;
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: "flex-start", alignItems: "center", paddingTop: 120 }}>
+        <T variant="heading" style={{ fontSize: 48, marginBottom: locked ? 16 : 0 }}>🔒</T>
+        <T variant="title" style={{ marginBottom: 24 }}>Locked</T>
+        {locked && (
+          <TouchableOpacity
+            onPress={async () => {
+              const result = await LocalAuthentication.authenticateAsync({ promptMessage: "Unlock Finance Tracker" });
+              setUnlocked(result.success);
+            }}
+            style={{ borderWidth: 2, borderColor: colors.accent, paddingHorizontal: 32, paddingVertical: 14 }}
+          >
+            <T variant="body" style={{ color: colors.accent, textTransform: "uppercase", fontSize: 14 }}>Unlock</T>
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  }
+  return <>{children}</>;
 }
