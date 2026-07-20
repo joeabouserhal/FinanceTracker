@@ -9,26 +9,29 @@ import { colors } from "@/theme/colors";
 import type { TransactionWithRelations } from "@/types/database";
 
 type DateRange = "all" | "today" | "month" | "year" | "custom";
+type TypeFilter = "all" | "income" | "expense";
 
 function todayISO(): string { return new Date().toISOString().slice(0, 10); }
 
 export default function TransactionsList() {
   const router = useRouter();
   const [filters, setFilters] = useState<TransactionFilters>({});
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [dateRange, setDateRange] = useState<DateRange>("all");
-  const { data: transactions, isLoading, refetch, isFetching } = useTransactions(filters);
+
+  const activeFilters = { ...filters, type: typeFilter === "all" ? undefined : typeFilter };
+  const { data: transactions, isLoading, refetch, isFetching } = useTransactions(activeFilters);
   const { data: categories } = useCategories();
   const grouped = groupByDate(transactions ?? []);
+
+  const typeCats = typeFilter === "all" ? categories : categories?.filter((c) => c.type === typeFilter);
 
   const [customVisible, setCustomVisible] = useState(false);
   const [customFrom, setCustomFrom] = useState(todayISO());
   const [customTo, setCustomTo] = useState(todayISO());
 
   const applyDateRange = (range: DateRange) => {
-    if (range === "custom") {
-      setCustomVisible(true);
-      return;
-    }
+    if (range === "custom") { setCustomVisible(true); return; }
     setDateRange(range);
     const today = todayISO();
     setFilters((f) => {
@@ -43,10 +46,7 @@ export default function TransactionsList() {
   };
 
   const applyCustomRange = () => {
-    if (customFrom > customTo) {
-      setCustomFrom(customTo);
-      setCustomTo(customFrom);
-    }
+    if (customFrom > customTo) { setCustomFrom(customTo); setCustomTo(customFrom); }
     setDateRange("custom");
     setFilters((f) => ({ ...f, dateFrom: customFrom > customTo ? customTo : customFrom, dateTo: customFrom > customTo ? customFrom : customTo }));
     setCustomVisible(false);
@@ -58,11 +58,20 @@ export default function TransactionsList() {
         <T variant="title">Transactions</T>
       </View>
 
+      {/* Type filter */}
+      <View style={{ paddingHorizontal: 16, marginBottom: 10 }}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {(["all", "income", "expense"] as TypeFilter[]).map((t) => (
+            <FilterChip key={t} label={t.charAt(0).toUpperCase() + t.slice(1)} active={typeFilter === t} onPress={() => { setTypeFilter(t); setFilters((f) => ({ ...f, categoryId: undefined })); }} />
+          ))}
+        </ScrollView>
+      </View>
+
       {/* Category filter */}
-      <View style={{ paddingHorizontal: 16, marginBottom: 4 }}>
+      <View style={{ paddingHorizontal: 16, marginBottom: 10 }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           <FilterChip label="All" active={!filters.categoryId} onPress={() => setFilters((f) => ({ ...f, categoryId: undefined }))} />
-          {categories?.map((c) => <FilterChip key={c.id} label={c.name} active={filters.categoryId === c.id} onPress={() => setFilters((f) => ({ ...f, categoryId: f.categoryId === c.id ? undefined : c.id }))} />)}
+          {typeCats?.map((c) => <FilterChip key={c.id} label={c.name} active={filters.categoryId === c.id} onPress={() => setFilters((f) => ({ ...f, categoryId: f.categoryId === c.id ? undefined : c.id }))} />)}
         </ScrollView>
       </View>
 
@@ -125,4 +134,4 @@ function groupByDate(txns: TransactionWithRelations[]): Record<string, Transacti
 
 function formatDateLabel(dateStr: string): string { const d = new Date(dateStr + "T00:00:00"); const now = new Date(); const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1); if (dateStr === now.toISOString().slice(0, 10)) return "Today"; if (dateStr === yesterday.toISOString().slice(0, 10)) return "Yesterday"; return d.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" }); }
 
-const inputStyle = { backgroundColor: "#0A0A0A", borderWidth: 2, borderColor: "#77746C", color: "#F5F1E8", paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, fontFamily: "IBMPlexSans", marginTop: 6 };
+const inputStyle = { backgroundColor: "#0A0A0A", borderWidth: 2, borderColor: "#555555", color: "#F5F1E8", paddingHorizontal: 14, paddingVertical: 14, fontSize: 15, fontFamily: "IBMPlexMono" };

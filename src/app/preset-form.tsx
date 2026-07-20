@@ -153,7 +153,7 @@ function toggleBtn(active: boolean, t: string) {
   };
 }
 
-const inputStyle = { backgroundColor: "#0A0A0A", borderWidth: 2, borderColor: "#77746C", color: "#F5F1E8", paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, fontFamily: "IBMPlexSans" };
+const inputStyle = { backgroundColor: "#0A0A0A", borderWidth: 2, borderColor: "#555555", color: "#F5F1E8", paddingHorizontal: 14, paddingVertical: 14, fontSize: 15, fontFamily: "IBMPlexMono" };
 
 function chip(active: boolean) {
   return { borderWidth: 2, borderColor: active ? colors.accent : colors.muted, backgroundColor: active ? colors.accent : "transparent", paddingHorizontal: 14, paddingVertical: 6, marginRight: 8 };

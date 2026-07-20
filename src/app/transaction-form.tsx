@@ -530,13 +530,12 @@ export default function TransactionForm() {
 const inputStyle = {
   backgroundColor: "#0A0A0A",
   borderWidth: 2,
-  borderColor: "#77746C",
+  borderColor: "#555555",
   color: "#F5F1E8",
   paddingHorizontal: 14,
-  paddingVertical: 12,
-  fontSize: 16,
-  fontFamily: "IBMPlexSans",
-  marginTop: 8,
+  paddingVertical: 14,
+  fontSize: 15,
+  fontFamily: "IBMPlexMono",
 };
 
 function chipStyle(active: boolean) {
