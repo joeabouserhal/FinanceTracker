@@ -167,6 +167,7 @@ export default function TransactionForm() {
     if (p.default_currency_id) setCurrencyId(p.default_currency_id);
     if (p.default_category_id) setCategoryId(p.default_category_id);
     if (p.default_account_id) setAccountId(p.default_account_id);
+    setTitle(p.name);
   };
 
   const handleSave = async () => {
