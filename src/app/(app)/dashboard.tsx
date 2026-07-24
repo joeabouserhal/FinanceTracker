@@ -3,6 +3,7 @@ import { TransactionRow } from "@/components/TransactionRow";
 import { useCurrencies } from "@/hooks/useCurrencies";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useTransactions } from "@/hooks/useTransactions";
+import { useSyncStore } from "@/components/OfflineSyncProvider";
 import { colors } from "@/theme/colors";
 import { formatNumber } from "@/utils/currency";
 import { useRouter } from "expo-router";
@@ -16,6 +17,8 @@ function monthBounds(key: string) { const [y, m] = key.split("-").map(Number); c
 export default function Dashboard() {
   const router = useRouter();
   const isConnected = useNetworkStatus((s) => s.isConnected);
+  const syncError = useSyncStore((s) => s.lastError);
+  const syncPending = useSyncStore((s) => s.pendingCount);
   const { data: transactions, isLoading, refetch, isFetching } = useTransactions();
   const { data: currencies } = useCurrencies();
   const [viewMonth, setViewMonth] = useState(() => monthKey(new Date()));
@@ -47,6 +50,16 @@ export default function Dashboard() {
           <T variant="mono" style={{ color: colors.background, fontSize: 11 }}>OFFLINE — changes saved locally</T>
         </View>
       )}
+      {syncError && isConnected && (
+        <View style={{ backgroundColor: colors.expense, paddingVertical: 4, alignItems: "center" }}>
+          <T variant="mono" style={{ color: colors.background, fontSize: 11 }}>SYNC FAILED</T>
+        </View>
+      )}
+      {syncPending > 0 && isConnected && !syncError && (
+        <View style={{ backgroundColor: colors.accent, paddingVertical: 4, alignItems: "center" }}>
+          <T variant="mono" style={{ color: colors.background, fontSize: 11 }}>SYNCING {syncPending} changes...</T>
+        </View>
+      )}
 
       <TouchableOpacity
         style={{ position: "absolute", bottom: 24, right: 24, zIndex: 10, backgroundColor: colors.accent, width: 56, height: 56, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.accent }}
@@ -57,7 +70,7 @@ export default function Dashboard() {
 
       <ScrollView
         style={{ flex: 1 }}
-        refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.accent} colors={[colors.accent]} progressBackgroundColor={colors.background} />}
+        refreshControl={<RefreshControl refreshing={false} onRefresh={() => { if (isConnected) refetch(); }} tintColor={colors.accent} colors={[colors.accent]} progressBackgroundColor={colors.background} />}
       >
         {/* Balance */}
         <View style={{ paddingHorizontal: 16, paddingBottom: 24, borderBottomWidth: 1, borderBottomColor: "#1A1A1A" }}>

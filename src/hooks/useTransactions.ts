@@ -11,11 +11,8 @@ import type {
 
 const KEY = ["transactions"] as const;
 
-function isOffline() {
-  // Default to false (online) so we try Supabase first.
-  // When NetInfo confirms we're offline, isConnected flips to false.
-  return !useNetworkStatus.getState().isConnected;
-}
+function isOffline() { return !useNetworkStatus.getState().isConnected; }
+function genId(): string { return `tmp_${Math.random().toString(36).slice(2, 11)}`; }
 
 export interface TransactionFilters {
   dateFrom?: string;
@@ -57,9 +54,21 @@ export function useAddTransaction() {
   return useMutation({
     mutationFn: async (input: TransactionInsert) => {
       if (isOffline()) {
-        await enqueue({ table: "transactions", action: "insert", payload: input });
-        const offlineId = `offline_${Date.now()}`;
-        return { id: offlineId, user_id: "", type: input.type, amount: input.amount, currency_id: input.currency_id, category_id: input.category_id, account_id: input.account_id, date: input.date, notes: input.notes, preset_id: input.preset_id, created_at: new Date().toISOString(), updated_at: new Date().toISOString() } as Transaction;
+        const clientId = genId();
+        await enqueue({
+          table: "transactions",
+          action: "insert",
+          payload: { ...input, client_id: clientId },
+          dependencies: [input.category_id, input.currency_id].filter((id) => id?.startsWith("tmp_")),
+        });
+        const now = new Date().toISOString();
+        return {
+          id: clientId, user_id: "", type: input.type, amount: input.amount,
+          currency_id: input.currency_id, category_id: input.category_id,
+          account_id: input.account_id, date: input.date, title: input.title ?? null,
+          notes: input.notes, preset_id: input.preset_id,
+          created_at: now, updated_at: now,
+        } as Transaction;
       }
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Not authenticated");
@@ -72,9 +81,7 @@ export function useAddTransaction() {
       return data as Transaction;
     },
     onSuccess: (data) => {
-      if (String(data.id).startsWith("offline_")) {
-        // Offline: inject into ALL transaction query caches
-        // Look up category/currency data from any categories/currencies query cache
+      if (String(data.id).startsWith("tmp_")) {
         const allCats = qc.getQueriesData<any[]>({ queryKey: ["categories"], exact: false });
         const allCurs = qc.getQueriesData<any[]>({ queryKey: ["currencies"], exact: false });
         const cat = allCats.flatMap(([, d]) => d ?? []).find((c: any) => c.id === data.category_id);
@@ -88,8 +95,6 @@ export function useAddTransaction() {
           created_at: data.created_at || new Date().toISOString(),
           updated_at: data.updated_at || new Date().toISOString(),
         };
-
-        // Update all transaction query caches (with and without filters)
         qc.setQueriesData<TransactionWithRelations[]>(
           { queryKey: KEY, exact: false },
           (old) => (old ? [fake, ...old] : [fake])
@@ -120,7 +125,6 @@ export function useUpdateTransaction() {
     },
     onSuccess: (data, variables) => {
       if (isOffline()) {
-        // Offline update: merge the updated fields into the cached item
         const { id, ...updates } = variables;
         qc.setQueriesData<TransactionWithRelations[]>(
           { queryKey: KEY, exact: false },
@@ -145,7 +149,6 @@ export function useDeleteTransaction() {
       if (error) throw error;
     },
     onSuccess: (_data, id) => {
-      // Remove from all transaction caches
       qc.setQueriesData<TransactionWithRelations[]>(
         { queryKey: KEY, exact: false },
         (old) => old?.filter((t) => t.id !== id) ?? []

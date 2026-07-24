@@ -3,6 +3,8 @@ import { View, ScrollView, TouchableOpacity, TextInput, Modal, ActivityIndicator
 import { useRouter } from "expo-router";
 import { useTransactions, type TransactionFilters } from "@/hooks/useTransactions";
 import { useCategories } from "@/hooks/useCategories";
+import { useCurrencies } from "@/hooks/useCurrencies";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { TransactionRow } from "@/components/TransactionRow";
 import { T } from "@/components/ThemedText";
 import { colors } from "@/theme/colors";
@@ -15,16 +17,21 @@ function todayISO(): string { return new Date().toISOString().slice(0, 10); }
 
 export default function TransactionsList() {
   const router = useRouter();
+  const isConnected = useNetworkStatus((s) => s.isConnected);
   const [filters, setFilters] = useState<TransactionFilters>({});
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [dateRange, setDateRange] = useState<DateRange>("all");
+  const [showFilters, setShowFilters] = useState(false);
 
   const activeFilters = { ...filters, type: typeFilter === "all" ? undefined : typeFilter };
   const { data: transactions, isLoading, refetch, isFetching } = useTransactions(activeFilters);
   const { data: categories } = useCategories();
+  const { data: currencies } = useCurrencies();
   const grouped = groupByDate(transactions ?? []);
 
   const typeCats = typeFilter === "all" ? categories : categories?.filter((c) => c.type === typeFilter);
+
+  const hasFilters = typeFilter !== "all" || filters.categoryId || filters.categoryIds?.length || filters.currencyId || dateRange !== "all";
 
   const [customVisible, setCustomVisible] = useState(false);
   const [customFrom, setCustomFrom] = useState(todayISO());
@@ -74,38 +81,59 @@ export default function TransactionsList() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
-      <View style={{ paddingHorizontal: 16, paddingTop: 48, paddingBottom: 16, backgroundColor: colors.background }}>
+      <View style={{ paddingHorizontal: 16, paddingTop: 48, paddingBottom: 16, backgroundColor: colors.background, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
         <T variant="title">Transactions</T>
+        <TouchableOpacity
+          onPress={() => {
+            if (showFilters) { setFilters({}); setTypeFilter("all"); setDateRange("all"); }
+            setShowFilters(!showFilters);
+          }}
+          style={{ borderWidth: 2, borderColor: hasFilters ? colors.accent : colors.muted, backgroundColor: hasFilters ? colors.accent : "transparent", paddingHorizontal: 12, paddingVertical: 6 }}
+        >
+          <T variant="label" style={{ color: hasFilters ? colors.background : colors.muted, fontSize: 12 }}>{showFilters ? "Hide" : "Filters"}</T>
+        </TouchableOpacity>
       </View>
 
-      {/* Type filter */}
-      <View style={{ paddingHorizontal: 16, marginBottom: 10 }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {(["all", "income", "expense"] as TypeFilter[]).map((t) => (
-            <FilterChip key={t} label={t.charAt(0).toUpperCase() + t.slice(1)} active={typeFilter === t} onPress={() => { setTypeFilter(t); setFilters((f) => ({ ...f, categoryId: undefined, categoryIds: undefined })); }} />
-          ))}
-        </ScrollView>
-      </View>
+      {showFilters && (
+        <>
+          {/* Type filter */}
+          <View style={{ paddingHorizontal: 16, marginBottom: 10 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {(["all", "income", "expense"] as TypeFilter[]).map((t) => (
+                <FilterChip key={t} label={t.charAt(0).toUpperCase() + t.slice(1)} active={typeFilter === t} onPress={() => { setTypeFilter(t); setFilters((f) => ({ ...f, categoryId: undefined, categoryIds: undefined })); }} />
+              ))}
+            </ScrollView>
+          </View>
 
-      {/* Category filter */}
-      <View style={{ paddingHorizontal: 16, marginBottom: 10 }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <TouchableOpacity onPress={openCatFilter} style={{ borderWidth: 2, borderColor: colors.accent, paddingHorizontal: 10, paddingVertical: 6, marginRight: 6, alignItems: "center", justifyContent: "center", backgroundColor: (filters.categoryIds?.length ?? 0) > 0 ? colors.accent : "transparent" }}>
-            <T variant="label" style={{ color: (filters.categoryIds?.length ?? 0) > 0 ? colors.background : colors.muted, fontSize: 12 }}>Filter</T>
-          </TouchableOpacity>
-          <FilterChip label="All" active={!filters.categoryId && !filters.categoryIds} onPress={() => setFilters((f) => ({ ...f, categoryId: undefined, categoryIds: undefined }))} />
-          {typeCats?.map((c) => <FilterChip key={c.id} label={c.name} active={filters.categoryId === c.id} onPress={() => setFilters((f) => ({ ...f, categoryId: f.categoryId === c.id ? undefined : c.id, categoryIds: undefined }))} />)}
-        </ScrollView>
-      </View>
+          {/* Category filter */}
+          <View style={{ paddingHorizontal: 16, marginBottom: 10 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <TouchableOpacity onPress={openCatFilter} style={{ borderWidth: 2, borderColor: (filters.categoryIds?.length ?? 0) > 0 ? colors.accent : colors.muted, paddingHorizontal: 10, paddingVertical: 6, marginRight: 6, alignItems: "center", justifyContent: "center", backgroundColor: (filters.categoryIds?.length ?? 0) > 0 ? colors.accent : "transparent" }}>
+                <T variant="label" style={{ color: (filters.categoryIds?.length ?? 0) > 0 ? colors.background : colors.muted, fontSize: 12 }}>Filter</T>
+              </TouchableOpacity>
+              <FilterChip label="All" active={!filters.categoryId && !filters.categoryIds} onPress={() => setFilters((f) => ({ ...f, categoryId: undefined, categoryIds: undefined }))} />
+              {typeCats?.map((c) => <FilterChip key={c.id} label={c.name} active={filters.categoryId === c.id} onPress={() => setFilters((f) => ({ ...f, categoryId: f.categoryId === c.id ? undefined : c.id, categoryIds: undefined }))} />)}
+            </ScrollView>
+          </View>
 
-      {/* Date range */}
-      <View style={{ paddingHorizontal: 16, marginBottom: 10 }}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          {(["all", "today", "month", "year", "custom"] as DateRange[]).map((r) => (
-            <FilterChip key={r} label={r.charAt(0).toUpperCase() + r.slice(1)} active={dateRange === r} onPress={() => applyDateRange(r)} />
-          ))}
-        </ScrollView>
-      </View>
+          {/* Currency filter */}
+          <View style={{ paddingHorizontal: 16, marginBottom: 10 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              <FilterChip label="All" active={!filters.currencyId} onPress={() => setFilters((f) => ({ ...f, currencyId: undefined }))} />
+              {currencies?.map((c) => <FilterChip key={c.id} label={c.code} active={filters.currencyId === c.id} onPress={() => setFilters((f) => ({ ...f, currencyId: f.currencyId === c.id ? undefined : c.id }))} />)}
+            </ScrollView>
+          </View>
+
+          {/* Date range */}
+          <View style={{ paddingHorizontal: 16, marginBottom: 10 }}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {(["all", "today", "month", "year", "custom"] as DateRange[]).map((r) => (
+                <FilterChip key={r} label={r.charAt(0).toUpperCase() + r.slice(1)} active={dateRange === r} onPress={() => applyDateRange(r)} />
+              ))}
+            </ScrollView>
+          </View>
+        </>
+      )}
 
       <TouchableOpacity style={{ position: "absolute", bottom: 24, right: 24, zIndex: 10, backgroundColor: colors.accent, width: 56, height: 56, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.accent }} onPress={() => router.push("/transaction-form")}>
         <T variant="heading" style={{ color: colors.background, fontSize: 28 }}>+</T>
@@ -114,7 +142,7 @@ export default function TransactionsList() {
       {isLoading ? <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} /> : Object.keys(grouped).length === 0 ? (
         <T variant="body" style={{ color: colors.muted, paddingHorizontal: 16, marginTop: 40, textAlign: "center" }}>No transactions found. Tap + to add one.</T>
       ) : (
-        <ScrollView refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.accent} colors={[colors.accent]} progressBackgroundColor={colors.background} />}>
+        <ScrollView refreshControl={<RefreshControl refreshing={false} onRefresh={() => { if (isConnected) refetch(); }} tintColor={colors.accent} colors={[colors.accent]} progressBackgroundColor={colors.background} />}>
           {Object.entries(grouped).map(([date, txns]) => (
             <View key={date} style={{ borderBottomWidth: 1, borderBottomColor: "#1A1A1A", paddingTop: 8, paddingBottom: 12 }}>
               <T variant="label" style={{ paddingHorizontal: 16, paddingVertical: 10 }}>{formatDateLabel(date)}</T>
