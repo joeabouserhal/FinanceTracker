@@ -19,7 +19,7 @@ export default function Dashboard() {
   const isConnected = useNetworkStatus((s) => s.isConnected);
   const syncError = useSyncStore((s) => s.lastError);
   const syncPending = useSyncStore((s) => s.pendingCount);
-  const { data: transactions, isLoading, refetch, isFetching } = useTransactions();
+  const { data: transactions, isLoading, refetch } = useTransactions();
   const { data: currencies } = useCurrencies();
   const [viewMonth, setViewMonth] = useState(() => monthKey(new Date()));
 
@@ -36,6 +36,7 @@ export default function Dashboard() {
   const allTime: Record<string, { code: string; symbol: string; net: number }> = {};
   for (const t of transactions ?? []) { const c = t.currency; if (!c) continue; if (!allTime[c.id]) allTime[c.id] = { code: c.code, symbol: c.symbol, net: 0 }; allTime[c.id].net += t.type === "income" ? t.amount : -t.amount; }
 
+  const defaultCurrencyId = currencies?.find((currency) => currency.is_default)?.id;
   const recentAll = transactions?.slice(0, 8) ?? [];
 
   return (
@@ -78,12 +79,25 @@ export default function Dashboard() {
           {Object.keys(allTime).length === 0 ? (
             <T variant="body" style={{ color: colors.muted, fontSize: 14 }}>No transactions yet</T>
           ) : (
-            Object.values(allTime).map((c) => (
-              <View key={c.code} style={{ flexDirection: "row", alignItems: "baseline", marginBottom: 8 }}>
-                <T variant="mono" style={{ fontSize: 14, color: colors.muted, minWidth: 40, textAlign: "right", marginRight: 8 }} numberOfLines={1}>{c.symbol}</T>
-                <T variant="mono" style={{ fontSize: 36, lineHeight: 40 }} numberOfLines={1}>{formatNumber(c.net / 100, c.net % 100 === 0 ? 0 : 2)}</T>
-              </View>
-            ))
+            Object.entries(allTime)
+              .sort(([idA, currencyA], [idB, currencyB]) => {
+                if (idA === defaultCurrencyId) return -1;
+                if (idB === defaultCurrencyId) return 1;
+                return currencyA.code.localeCompare(currencyB.code);
+              })
+              .map(([, c]) => {
+              const isNegative = c.net < 0;
+              return (
+                <View key={c.code} style={{ flexDirection: "row", alignItems: "baseline", marginBottom: 8 }}>
+                  <T variant="label" style={{ color: colors.muted, fontSize: 14, width: 30 }}>{c.symbol}</T>
+                  <View style={{ flex: 1, flexDirection: "row", alignItems: "baseline" }}>
+                    <T variant="mono" style={{ flex: 1, color: isNegative ? colors.expense : colors.ink, fontSize: 36, lineHeight: 40 }} numberOfLines={1} adjustsFontSizeToFit>
+                      {isNegative ? "−" : ""}{formatNumber(Math.abs(c.net) / 100, Math.abs(c.net) % 100 === 0 ? 0 : 2)}
+                    </T>
+                  </View>
+                </View>
+              );
+            })
           )}
         </View>
 
