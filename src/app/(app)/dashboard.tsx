@@ -108,7 +108,7 @@ export default function Dashboard() {
             <T variant="label">Recent</T>
             <TouchableOpacity onPress={() => router.push("/(app)/transactions")}><T variant="body" style={{ color: colors.accent, fontSize: 12 }}>See All</T></TouchableOpacity>
           </View>
-          {isLoading ? <ActivityIndicator color={colors.accent} style={{ marginTop: 20 }} /> : recentAll.length === 0 ? <T variant="body" style={{ color: colors.muted, paddingHorizontal: 16, fontSize: 14 }}>No transactions yet. Tap Transact to add one.</T> : recentAll.map((t) => <TransactionRow key={t.id} transaction={t} onPress={() => router.push({ pathname: "/transaction-form", params: { id: t.id } })} />)}
+          {isLoading ? <ActivityIndicator color={colors.accent} style={{ marginTop: 20 }} /> : recentAll.length === 0 ? <T variant="body" style={{ color: colors.muted, paddingHorizontal: 16, fontSize: 14 }}>No transactions yet. Tap Transact to add one.</T> : recentAll.map((t, i) => <TransactionRow key={t.id} transaction={t} isLast={i === recentAll.length - 1} onPress={() => router.push({ pathname: "/transaction-form", params: { id: t.id } })} />)}
         </View>
         <View style={{ height: 80 }} />
       </ScrollView>

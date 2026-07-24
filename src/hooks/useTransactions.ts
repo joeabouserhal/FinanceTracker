@@ -21,6 +21,7 @@ export interface TransactionFilters {
   dateFrom?: string;
   dateTo?: string;
   categoryId?: string;
+  categoryIds?: string[];
   accountId?: string;
   currencyId?: string;
   type?: "income" | "expense";
@@ -39,6 +40,7 @@ export function useTransactions(filters?: TransactionFilters) {
       if (filters?.dateFrom) query = query.gte("date", filters.dateFrom);
       if (filters?.dateTo) query = query.lte("date", filters.dateTo);
       if (filters?.categoryId) query = query.eq("category_id", filters.categoryId);
+      if (filters?.categoryIds && filters.categoryIds.length > 0) query = query.in("category_id", filters.categoryIds);
       if (filters?.accountId) query = query.eq("account_id", filters.accountId);
       if (filters?.currencyId) query = query.eq("currency_id", filters.currencyId);
       if (filters?.type) query = query.eq("type", filters.type);

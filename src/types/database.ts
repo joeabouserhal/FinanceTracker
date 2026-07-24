@@ -49,6 +49,7 @@ export interface Transaction {
   category_id: string;
   account_id: string | null;
   date: string;
+  title: string | null;
   notes: string | null;
   preset_id: string | null;
   created_at: string;
@@ -65,7 +66,7 @@ export type PresetInsert = Pick<
 >;
 export type TransactionInsert = Pick<
   Transaction,
-  "type" | "amount" | "currency_id" | "category_id" | "account_id" | "date" | "notes" | "preset_id"
+  "type" | "amount" | "currency_id" | "category_id" | "account_id" | "date" | "title" | "notes" | "preset_id"
 >;
 
 // Update types
@@ -73,7 +74,7 @@ export type CurrencyUpdate = Partial<Pick<Currency, "code" | "symbol" | "name" |
 export type CategoryUpdate = Partial<Pick<Category, "name" | "type" | "icon" | "color">>;
 export type AccountUpdate = Partial<Pick<Account, "name" | "archived">>;
 export type PresetUpdate = Partial<Pick<Preset, "name" | "type" | "default_amount" | "default_currency_id" | "default_category_id" | "default_account_id" | "archived">>;
-export type TransactionUpdate = Partial<Pick<Transaction, "type" | "amount" | "currency_id" | "category_id" | "account_id" | "date" | "notes">>;
+export type TransactionUpdate = Partial<Pick<Transaction, "type" | "amount" | "currency_id" | "category_id" | "account_id" | "date" | "title" | "notes">>;
 
 // Transaction with joined relations (for display)
 export interface TransactionWithRelations extends Transaction {

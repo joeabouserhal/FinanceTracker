@@ -51,10 +51,11 @@ export default function PresetsList() {
       <ScrollView style={{ flex: 1 }}>
         {!filteredPresets || filteredPresets.length === 0 ? (
           <T variant="body" style={{ color: colors.muted, paddingHorizontal: 16, marginTop: 40, textAlign: "center" }}>No presets yet. Tap + to create one.</T>
-        ) : filteredPresets.map((p) => {
+        ) : filteredPresets.map((p, i) => {
           const cat = p.default_category_id ? catMap.get(p.default_category_id) : null;
+          const isLast = i === filteredPresets.length - 1;
           return (
-            <TouchableOpacity key={p.id} onPress={() => router.push({ pathname: "/preset-form", params: { id: p.id } })} style={{ padding: 16, borderBottomWidth: 1, borderBottomColor: "#77746C", borderStyle: "dashed", flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+            <TouchableOpacity key={p.id} onPress={() => router.push({ pathname: "/preset-form", params: { id: p.id } })} style={{ padding: 16, flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderBottomWidth: isLast ? 0 : 1, borderBottomColor: "#77746C", borderStyle: "dashed" }}>
               <View style={{ flex: 1 }}>
                 <T variant="body" style={{ fontSize: 16 }}>{p.name}</T>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginTop: 2 }}>

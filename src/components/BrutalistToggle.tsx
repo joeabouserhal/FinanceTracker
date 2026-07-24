@@ -7,7 +7,7 @@ const STORAGE_KEY = "biometric_enabled";
 
 export async function getBiometricEnabled(): Promise<boolean> {
   const val = await AsyncStorage.getItem(STORAGE_KEY);
-  return val !== "false"; // default to true
+  return val === "true"; // default to false
 }
 
 export async function setBiometricEnabled(enabled: boolean) {

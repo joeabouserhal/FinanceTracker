@@ -78,6 +78,7 @@ CREATE TABLE transactions (
   category_id   UUID NOT NULL REFERENCES categories(id) ON DELETE RESTRICT,
   account_id    UUID REFERENCES accounts(id) ON DELETE SET NULL,
   date          DATE NOT NULL DEFAULT CURRENT_DATE,
+  title         TEXT,
   notes         TEXT,
   preset_id     UUID REFERENCES presets(id) ON DELETE SET NULL,
   created_at    TIMESTAMPTZ DEFAULT now(),

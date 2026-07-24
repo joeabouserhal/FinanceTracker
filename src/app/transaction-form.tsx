@@ -15,11 +15,14 @@ import type { TransactionInsert } from "@/types/database";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { useCallback, useRef, useState } from "react";
 import {
-  ActivityIndicator,
-  ScrollView,
-  TextInput,
-  TouchableOpacity,
   View,
+  TextInput,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from "react-native";
 
 function todayISO(): string {
@@ -77,11 +80,14 @@ export default function TransactionForm() {
   const [accountId, setAccountId] = useState(existing?.account_id ?? "");
   const [date, setDate] = useState(existing?.date ?? todayISO());
   const [notes, setNotes] = useState(existing?.notes ?? "");
+  const [title, setTitle] = useState(existing?.title ?? "");
   const [saving, setSaving] = useState(false);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState("");
   const [alertMessage, setAlertMessage] = useState("");
   const [confirmVisible, setConfirmVisible] = useState(false);
+  const [catSearchVisible, setCatSearchVisible] = useState(false);
+  const [catSearchQuery, setCatSearchQuery] = useState("");
 
   const showAlert = (title: string, message: string) => {
     setAlertTitle(title);
@@ -112,6 +118,7 @@ export default function TransactionForm() {
         setCategoryId("");
         setAccountId("");
         setNotes("");
+        setTitle("");
       } else if (existing) {
         setAmount(addCommas(String(existing.amount / 100)));
         setType(existing.type);
@@ -120,8 +127,9 @@ export default function TransactionForm() {
         setAccountId(existing.account_id ?? "");
         setDate(existing.date);
         setNotes(existing.notes ?? "");
+        setTitle(existing.title ?? "");
       }
-    }, [isEdit, existing?.id, existing?.amount, existing?.type, existing?.category_id, existing?.notes, existing?.date])
+    }, [isEdit, existing?.id, existing?.amount, existing?.type, existing?.category_id, existing?.notes, existing?.date, existing?.title])
   );
 
   const handleAmountChange = (text: string) => {
@@ -163,8 +171,8 @@ export default function TransactionForm() {
 
   const handleSave = async () => {
     const rawAmount = getRawAmount();
-    if (!rawAmount || !currencyId || !categoryId) {
-      showAlert("Missing fields", "Amount, currency, and category are required.");
+    if (!rawAmount || !currencyId || !categoryId || !title.trim()) {
+      showAlert("Missing fields", "Amount, currency, category, and title are required.");
       return;
     }
 
@@ -181,6 +189,7 @@ export default function TransactionForm() {
       category_id: categoryId,
       account_id: accountId || null,
       date,
+      title: title || null,
       notes: notes || null,
       preset_id: null,
     };
@@ -245,6 +254,7 @@ export default function TransactionForm() {
         </TouchableOpacity>
       </View>
 
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior="height">
       <ScrollView
         style={{ flex: 1 }}
         contentContainerStyle={{ paddingHorizontal: 16 }}
@@ -337,6 +347,16 @@ export default function TransactionForm() {
           ))}
         </View>
 
+        {/* Title */}
+        <T variant="label">Title</T>
+        <TextInput
+          style={[inputStyle, { marginTop: 8, marginBottom: 20 }]}
+          placeholder="e.g. Weekly groceries"
+          placeholderTextColor={colors.muted}
+          value={title}
+          onChangeText={setTitle}
+        />
+
         {/* Category */}
         <T variant="label">Category</T>
         {!categories || filteredCategories.length === 0 ? (
@@ -349,6 +369,12 @@ export default function TransactionForm() {
           showsHorizontalScrollIndicator={false}
           style={{ marginTop: 8, marginBottom: 20 }}
         >
+          <TouchableOpacity
+            onPress={() => setCatSearchVisible(true)}
+            style={{ borderWidth: 2, borderColor: colors.muted, paddingHorizontal: 10, paddingVertical: 6, marginRight: 8, alignItems: "center", justifyContent: "center" }}
+          >
+            <T variant="label" style={{ color: colors.muted, fontSize: 13 }}>🔍</T>
+          </TouchableOpacity>
           {filteredCategories.map((c) => (
             <TouchableOpacity
               key={c.id}
@@ -501,6 +527,7 @@ export default function TransactionForm() {
 
         <View style={{ height: 60 }} />
       </ScrollView>
+      </KeyboardAvoidingView>
 
       <ThemedAlert
         visible={alertVisible}
@@ -523,6 +550,40 @@ export default function TransactionForm() {
         }}
         onCancel={() => setConfirmVisible(false)}
       />
+
+      {/* Category search modal */}
+      <Modal transparent visible={catSearchVisible} animationType="fade" onRequestClose={() => setCatSearchVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", padding: 24, paddingTop: 80 }}>
+          <View style={{ backgroundColor: colors.background, borderWidth: 2, borderColor: "#1A1A1A", padding: 16, flex: 1 }}>
+            <View style={{ flexDirection: "row", marginBottom: 16 }}>
+              <TextInput
+                style={{ flex: 1, backgroundColor: "#0A0A0A", borderWidth: 2, borderColor: "#555", color: "#F5F1E8", paddingHorizontal: 14, paddingVertical: 0, fontSize: 15, fontFamily: "IBMPlexMono", height: 44, textAlignVertical: "center", includeFontPadding: false }}
+                placeholder="Search"
+                placeholderTextColor="#333"
+                value={catSearchQuery}
+                onChangeText={setCatSearchQuery}
+                autoFocus
+              />
+              <TouchableOpacity onPress={() => setCatSearchVisible(false)} style={{ borderWidth: 2, borderColor: colors.muted, paddingHorizontal: 14, justifyContent: "center", marginLeft: 8 }}>
+                <T variant="body" style={{ color: colors.muted, fontSize: 14, textTransform: "uppercase" }}>Close</T>
+              </TouchableOpacity>
+            </View>
+            <ScrollView>
+              {filteredCategories.filter((c) => c.name.toLowerCase().includes(catSearchQuery.toLowerCase())).map((c) => (
+                <TouchableOpacity
+                  key={c.id}
+                  onPress={() => { setCategoryId(c.id); setCatSearchVisible(false); setCatSearchQuery(""); }}
+                  style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#1A1A1A" }}
+                >
+                  <View style={{ width: 12, height: 12, backgroundColor: c.color ?? colors.muted, marginRight: 12 }} />
+                  <T variant="body" style={{ fontSize: 16, color: categoryId === c.id ? colors.accent : colors.ink }}>{c.name}</T>
+                  {categoryId === c.id && <T variant="label" style={{ color: colors.accent, marginLeft: 8 }}>✓</T>}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

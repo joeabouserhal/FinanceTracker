@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, ScrollView, TouchableOpacity, TextInput, Modal, ActivityIndicator, RefreshControl } from "react-native";
+import { View, ScrollView, TouchableOpacity, TextInput, Modal, ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform } from "react-native";
 import { useRouter } from "expo-router";
 import { useTransactions, type TransactionFilters } from "@/hooks/useTransactions";
 import { useCategories } from "@/hooks/useCategories";
@@ -30,6 +30,11 @@ export default function TransactionsList() {
   const [customFrom, setCustomFrom] = useState(todayISO());
   const [customTo, setCustomTo] = useState(todayISO());
 
+  // Category filter modal
+  const [catFilterVisible, setCatFilterVisible] = useState(false);
+  const [catFilterQuery, setCatFilterQuery] = useState("");
+  const [pendingCatIds, setPendingCatIds] = useState<string[]>(filters.categoryIds ?? []);
+
   const applyDateRange = (range: DateRange) => {
     if (range === "custom") { setCustomVisible(true); return; }
     setDateRange(range);
@@ -52,6 +57,21 @@ export default function TransactionsList() {
     setCustomVisible(false);
   };
 
+  const openCatFilter = () => {
+    setPendingCatIds(filters.categoryIds ?? []);
+    setCatFilterQuery("");
+    setCatFilterVisible(true);
+  };
+
+  const togglePending = (id: string) => {
+    setPendingCatIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  };
+
+  const applyCatFilter = () => {
+    setFilters((f) => ({ ...f, categoryId: undefined, categoryIds: pendingCatIds.length > 0 ? pendingCatIds : undefined }));
+    setCatFilterVisible(false);
+  };
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ paddingHorizontal: 16, paddingTop: 48, paddingBottom: 16, backgroundColor: colors.background }}>
@@ -62,7 +82,7 @@ export default function TransactionsList() {
       <View style={{ paddingHorizontal: 16, marginBottom: 10 }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {(["all", "income", "expense"] as TypeFilter[]).map((t) => (
-            <FilterChip key={t} label={t.charAt(0).toUpperCase() + t.slice(1)} active={typeFilter === t} onPress={() => { setTypeFilter(t); setFilters((f) => ({ ...f, categoryId: undefined })); }} />
+            <FilterChip key={t} label={t.charAt(0).toUpperCase() + t.slice(1)} active={typeFilter === t} onPress={() => { setTypeFilter(t); setFilters((f) => ({ ...f, categoryId: undefined, categoryIds: undefined })); }} />
           ))}
         </ScrollView>
       </View>
@@ -70,8 +90,11 @@ export default function TransactionsList() {
       {/* Category filter */}
       <View style={{ paddingHorizontal: 16, marginBottom: 10 }}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <FilterChip label="All" active={!filters.categoryId} onPress={() => setFilters((f) => ({ ...f, categoryId: undefined }))} />
-          {typeCats?.map((c) => <FilterChip key={c.id} label={c.name} active={filters.categoryId === c.id} onPress={() => setFilters((f) => ({ ...f, categoryId: f.categoryId === c.id ? undefined : c.id }))} />)}
+          <TouchableOpacity onPress={openCatFilter} style={{ borderWidth: 2, borderColor: colors.accent, paddingHorizontal: 10, paddingVertical: 6, marginRight: 6, alignItems: "center", justifyContent: "center", backgroundColor: (filters.categoryIds?.length ?? 0) > 0 ? colors.accent : "transparent" }}>
+            <T variant="label" style={{ color: (filters.categoryIds?.length ?? 0) > 0 ? colors.background : colors.muted, fontSize: 12 }}>Filter</T>
+          </TouchableOpacity>
+          <FilterChip label="All" active={!filters.categoryId && !filters.categoryIds} onPress={() => setFilters((f) => ({ ...f, categoryId: undefined, categoryIds: undefined }))} />
+          {typeCats?.map((c) => <FilterChip key={c.id} label={c.name} active={filters.categoryId === c.id} onPress={() => setFilters((f) => ({ ...f, categoryId: f.categoryId === c.id ? undefined : c.id, categoryIds: undefined }))} />)}
         </ScrollView>
       </View>
 
@@ -93,9 +116,9 @@ export default function TransactionsList() {
       ) : (
         <ScrollView refreshControl={<RefreshControl refreshing={isFetching} onRefresh={refetch} tintColor={colors.accent} colors={[colors.accent]} progressBackgroundColor={colors.background} />}>
           {Object.entries(grouped).map(([date, txns]) => (
-            <View key={date}>
-              <T variant="label" style={{ paddingHorizontal: 16, paddingVertical: 8 }}>{formatDateLabel(date)}</T>
-              {txns.map((t) => <TransactionRow key={t.id} transaction={t} onPress={() => router.push({ pathname: "/transaction-form", params: { id: t.id } })} />)}
+            <View key={date} style={{ borderBottomWidth: 1, borderBottomColor: "#1A1A1A", paddingTop: 8, paddingBottom: 12 }}>
+              <T variant="label" style={{ paddingHorizontal: 16, paddingVertical: 10 }}>{formatDateLabel(date)}</T>
+              {txns.map((t, j) => <TransactionRow key={t.id} transaction={t} isLast={j === txns.length - 1} onPress={() => router.push({ pathname: "/transaction-form", params: { id: t.id } })} />)}
             </View>
           ))}
           <View style={{ height: 100 }} />
@@ -121,6 +144,43 @@ export default function TransactionsList() {
             </View>
           </View>
         </View>
+      </Modal>
+
+      {/* Category filter modal (multi-select) */}
+      <Modal transparent visible={catFilterVisible} animationType="fade" onRequestClose={() => setCatFilterVisible(false)}>
+        <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : undefined} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", padding: 24, paddingTop: 80 }}>
+          <View style={{ backgroundColor: colors.background, borderWidth: 2, borderColor: "#1A1A1A", padding: 16, flex: 1 }}>
+            <View style={{ flexDirection: "row", marginBottom: 16 }}>
+              <TextInput
+                style={{ flex: 1, backgroundColor: "#0A0A0A", borderWidth: 2, borderColor: "#555", color: "#F5F1E8", paddingHorizontal: 14, paddingVertical: 0, fontSize: 15, fontFamily: "IBMPlexMono", height: 44, textAlignVertical: "center", includeFontPadding: false }}
+                placeholder="Search"
+                placeholderTextColor="#333"
+                value={catFilterQuery}
+                onChangeText={setCatFilterQuery}
+                autoFocus
+              />
+              <TouchableOpacity onPress={applyCatFilter} style={{ borderWidth: 2, borderColor: colors.accent, backgroundColor: colors.accent, paddingHorizontal: 14, justifyContent: "center", marginLeft: 8 }}>
+                <T variant="body" style={{ color: colors.background, fontSize: 14, textTransform: "uppercase", fontWeight: "700" }}>Done</T>
+              </TouchableOpacity>
+            </View>
+            <ScrollView style={{ flex: 1 }}>
+              <T variant="label" style={{ marginBottom: 8, color: colors.muted }}>Tap categories to select, then press Done</T>
+              {typeCats?.filter((c) => c.name.toLowerCase().includes(catFilterQuery.toLowerCase())).map((c) => (
+                <TouchableOpacity
+                  key={c.id}
+                  onPress={() => togglePending(c.id)}
+                  style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#1A1A1A" }}
+                >
+                  <View style={{ width: 12, height: 12, backgroundColor: c.color ?? colors.muted, marginRight: 12 }} />
+                  <T variant="body" style={{ fontSize: 16, color: pendingCatIds.includes(c.id) ? colors.accent : colors.ink }}>{c.name}</T>
+                  <View style={{ width: 20, height: 20, borderWidth: 2, borderColor: pendingCatIds.includes(c.id) ? colors.accent : colors.muted, backgroundColor: pendingCatIds.includes(c.id) ? colors.accent : "transparent", marginLeft: "auto", alignItems: "center", justifyContent: "center" }}>
+                    {pendingCatIds.includes(c.id) && <T variant="body" style={{ color: colors.background, fontSize: 12 }}>✓</T>}
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

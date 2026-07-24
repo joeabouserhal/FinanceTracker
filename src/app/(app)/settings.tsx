@@ -29,7 +29,7 @@ export default function Settings() {
   const [catName, setCatName] = useState("");
   const [catType, setCatType] = useState<"expense" | "income">("expense");
   const [catColor, setCatColor] = useState(PRESET_COLORS[0]);
-  const [biometricOn, setBiometricOn] = useState(true);
+  const [biometricOn, setBiometricOn] = useState(false);
 
   useEffect(() => { getBiometricEnabled().then(setBiometricOn); }, []);
 
@@ -97,11 +97,11 @@ export default function Settings() {
           </View>
         ))}
 
-        <View style={{ flexDirection: "row", gap: 8, marginTop: S / 2 }}>
-          <TextInput style={inputStyle} placeholder="USD" placeholderTextColor={colors.muted} value={newCode} onChangeText={setNewCode} />
-          <TextInput style={inputStyle} placeholder="$" placeholderTextColor={colors.muted} value={newSymbol} onChangeText={setNewSymbol} />
-          <TextInput style={[inputStyle, { flex: 2 }]} placeholder="Name" placeholderTextColor={colors.muted} value={newName} onChangeText={setNewName} />
-          <TouchableOpacity onPress={handleAddCurrency} style={{ borderWidth: 2, borderColor: colors.accent, backgroundColor: colors.accent, paddingHorizontal: S, justifyContent: "center" }}>
+        <View style={{ flexDirection: "row", gap: 8, marginTop: S / 2, alignItems: "center" }}>
+          <TextInput style={compactInput} placeholder="USD" placeholderTextColor={colors.muted} value={newCode} onChangeText={setNewCode} />
+          <TextInput style={compactInput} placeholder="$" placeholderTextColor={colors.muted} value={newSymbol} onChangeText={setNewSymbol} />
+          <TextInput style={[compactInput, { flex: 2 }]} placeholder="Name" placeholderTextColor={colors.muted} value={newName} onChangeText={setNewName} />
+          <TouchableOpacity onPress={handleAddCurrency} style={{ borderWidth: 2, borderColor: colors.accent, backgroundColor: colors.accent, paddingHorizontal: 14, paddingVertical: 8, justifyContent: "center" }}>
             <T variant="label" style={{ color: colors.background, fontSize: 12 }}>Add</T>
           </TouchableOpacity>
         </View>
@@ -195,3 +195,4 @@ export default function Settings() {
 }
 
 const inputStyle = { backgroundColor: "#0A0A0A", borderWidth: 2, borderColor: "#555555", color: "#F5F1E8", paddingHorizontal: 14, paddingVertical: 14, fontSize: 15, fontFamily: "IBMPlexMono" };
+const compactInput = { backgroundColor: "#0A0A0A", borderWidth: 2, borderColor: "#555555", color: "#F5F1E8", paddingHorizontal: 10, paddingVertical: 8, fontSize: 13, fontFamily: "IBMPlexMono" };
