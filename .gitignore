@@ -45,3 +45,7 @@ example
 /android
 
 .hermes/
+
+# build artifacts
+build/
+build-*.apk
