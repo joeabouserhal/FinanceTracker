@@ -6,12 +6,14 @@ import { useAddCurrency, useCurrencies, useDeleteCurrency, useSetDefaultCurrency
 import { colors } from "@/theme/colors";
 import { useEffect, useState } from "react";
 import { Modal, ScrollView, TextInput, TouchableOpacity, View } from "react-native";
+import { useRouter } from "expo-router";
 
 const PRESET_COLORS = ["#4C9A63", "#E8432E", "#F4C430", "#77746C", "#3B82F6", "#8B5CF6", "#EC4899", "#14B8A6"];
 const S = 16;
 
 export default function Settings() {
   const { user, signOut } = useAuth();
+  const router = useRouter();
   const { data: currencies } = useCurrencies();
   const { data: categories } = useCategories();
   const addCurrency = useAddCurrency();
@@ -29,15 +31,23 @@ export default function Settings() {
   useEffect(() => { getBiometricEnabled().then(setBiometricOn); }, []);
 
   const toggleBiometric = () => { const next = !biometricOn; setBiometricOn(next); setBiometricEnabled(next); };
+  const handleSignOut = async () => { await signOut(); router.replace("/"); };
 
   // Category modals
   const [addModal, setAddModal] = useState(false);
   const [catName, setCatName] = useState("");
   const [catType, setCatType] = useState<"expense" | "income">("expense");
   const [catColor, setCatColor] = useState(PRESET_COLORS[0]);
-  const openAddCategory = () => { setCatName(""); setCatType("expense"); setCatColor(PRESET_COLORS[0]); setAddModal(true); };
-  const handleAddCategory = async () => { if (!catName.trim()) return; try { await addCategory.mutateAsync({ name: catName.trim(), type: catType, icon: null, color: catColor }); setAddModal(false); } catch {} };
+  const [catSaving, setCatSaving] = useState(false);
 
+  const openAddCategory = () => { setCatName(""); setCatType("expense"); setCatColor(PRESET_COLORS[0]); setAddModal(true); };
+  const handleAddCategory = async () => {
+    if (!catName.trim() || catSaving) return;
+    setCatSaving(true);
+    try { await addCategory.mutateAsync({ name: catName.trim(), type: catType, icon: null, color: catColor }); setAddModal(false); }
+    catch (e: any) { showConfirm("Error", e.message || "Failed to add category", () => {}); }
+    finally { setCatSaving(false); }
+  };
   const [editModal, setEditModal] = useState(false);
   const [editId, setEditId] = useState("");
   const [editName, setEditName] = useState("");
@@ -72,7 +82,7 @@ export default function Settings() {
         {/* ── Account ── */}
         <View style={row}>
           <T variant="body" style={{ fontSize: 14, color: colors.muted }}>{user?.email}</T>
-          <TouchableOpacity onPress={signOut} style={{ borderWidth: 2, borderColor: colors.expense, paddingVertical: 6, paddingHorizontal: S }}>
+          <TouchableOpacity onPress={handleSignOut} style={{ borderWidth: 2, borderColor: colors.expense, paddingVertical: 6, paddingHorizontal: S }}>
             <T variant="label" style={{ color: colors.expense, fontSize: 11 }}>SIGN OUT</T>
           </TouchableOpacity>
         </View>
@@ -80,7 +90,7 @@ export default function Settings() {
         {/* ── Biometric ── */}
         <View style={secHead}>
           <T variant="label" style={{ marginBottom: 8 }}>Security</T>
-          <BrutalistToggle value={biometricOn} onToggle={toggleBiometric} label="Require biometrics on launch" />
+          <BrutalistToggle value={biometricOn} onToggle={toggleBiometric} label="Biometric lock" />
         </View>
 
         {/* ── Currencies ── */}
@@ -156,8 +166,8 @@ export default function Settings() {
               <TouchableOpacity onPress={() => setAddModal(false)} style={{ flex: 1, borderWidth: 2, borderColor: colors.muted, paddingVertical: 10, alignItems: "center" }}>
                 <T variant="body" style={{ color: colors.muted, fontSize: 14, textTransform: "uppercase" }}>Cancel</T>
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleAddCategory} style={{ flex: 1, borderWidth: 2, borderColor: colors.accent, backgroundColor: colors.accent, paddingVertical: 10, alignItems: "center" }}>
-                <T variant="body" style={{ color: colors.background, fontSize: 14, textTransform: "uppercase", fontWeight: "700" }}>Add</T>
+              <TouchableOpacity onPress={handleAddCategory} disabled={catSaving} style={{ flex: 1, borderWidth: 2, borderColor: colors.accent, backgroundColor: catSaving ? "transparent" : colors.accent, paddingVertical: 10, alignItems: "center" }}>
+                <T variant="body" style={{ color: catSaving ? colors.accent : colors.background, fontSize: 14, textTransform: "uppercase", fontWeight: "700" }}>{catSaving ? "..." : "Add"}</T>
               </TouchableOpacity>
             </View>
           </View>

@@ -22,6 +22,7 @@ export interface TransactionFilters {
   accountId?: string;
   currencyId?: string;
   type?: "income" | "expense";
+  search?: string;
 }
 
 export function useTransactions(filters?: TransactionFilters) {
@@ -41,6 +42,7 @@ export function useTransactions(filters?: TransactionFilters) {
       if (filters?.accountId) query = query.eq("account_id", filters.accountId);
       if (filters?.currencyId) query = query.eq("currency_id", filters.currencyId);
       if (filters?.type) query = query.eq("type", filters.type);
+      if (filters?.search) query = query.ilike("title", `%${filters.search}%`);
 
       const { data, error } = await query;
       if (error) throw error;

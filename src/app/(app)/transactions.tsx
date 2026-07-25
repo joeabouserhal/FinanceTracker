@@ -1,14 +1,16 @@
 import { useState } from "react";
-import { View, ScrollView, TouchableOpacity, TextInput, Modal, ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform } from "react-native";
+import { View, ScrollView, TouchableOpacity, TextInput, Modal, ActivityIndicator, RefreshControl, KeyboardAvoidingView, Platform, Animated } from "react-native";
 import { useRouter } from "expo-router";
 import { useTransactions, type TransactionFilters } from "@/hooks/useTransactions";
 import { useCategories } from "@/hooks/useCategories";
 import { useCurrencies } from "@/hooks/useCurrencies";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { TransactionRow } from "@/components/TransactionRow";
+import { AnimatedFAB } from "@/components/AnimatedFAB";
 import { T } from "@/components/ThemedText";
 import { colors } from "@/theme/colors";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { useExpandCollapse } from "@/utils/animations";
 import type { TransactionWithRelations } from "@/types/database";
 
 type DateRange = "all" | "today" | "month" | "year" | "custom";
@@ -79,24 +81,26 @@ export default function TransactionsList() {
     setFilters((f) => ({ ...f, categoryId: undefined, categoryIds: pendingCatIds.length > 0 ? pendingCatIds : undefined }));
     setCatFilterVisible(false);
   };
+  const searchCats = typeCats?.filter((c) => c.name.toLowerCase().includes(catFilterQuery.toLowerCase())) ?? [];
+
+  const expand = useExpandCollapse(showFilters);
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       <View style={{ paddingHorizontal: 16, paddingTop: 48, paddingBottom: 16, backgroundColor: colors.background, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
         <T variant="title">Transactions</T>
         <TouchableOpacity
-          onPress={() => {
-            if (showFilters) { setFilters({}); setTypeFilter("all"); setDateRange("all"); }
-            setShowFilters(!showFilters);
-          }}
+          onPress={() => setShowFilters(!showFilters)}
           style={{ borderWidth: 2, borderColor: hasFilters ? colors.accent : colors.muted, backgroundColor: hasFilters ? colors.accent : "transparent", paddingHorizontal: 12, paddingVertical: 6 }}
         >
           <T variant="label" style={{ color: hasFilters ? colors.background : colors.muted, fontSize: 12 }}>{showFilters ? "Hide" : "Filters"}</T>
         </TouchableOpacity>
       </View>
 
-      {showFilters && (
-        <>
+      {expand.render && (
+      <Animated.View style={expand.outerStyle}>
+      <Animated.View style={expand.innerStyle}>
+        <View>
           {/* Type filter */}
           <View style={{ paddingHorizontal: 16, marginBottom: 10 }}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -133,12 +137,33 @@ export default function TransactionsList() {
               ))}
             </ScrollView>
           </View>
-        </>
+
+          {/* Search */}
+          <View style={{ paddingHorizontal: 16, marginBottom: 10, flexDirection: "row", alignItems: "center" }}>
+            <View style={{ flexDirection: "row", alignItems: "center", flex: 1, backgroundColor: "#0A0A0A", borderWidth: 2, borderColor: "#555", height: 44, paddingHorizontal: 10 }}>
+              <MaterialCommunityIcons name="magnify" size={16} color={colors.muted} style={{ marginRight: 8 }} />
+              <TextInput
+                style={{ flex: 1, color: "#F5F1E8", fontSize: 15, fontFamily: "IBMPlexMono", paddingVertical: 0, textAlignVertical: "center", includeFontPadding: false }}
+                placeholder="Search by title"
+                placeholderTextColor="#333"
+                value={filters.search ?? ""}
+                onChangeText={(t) => setFilters((f) => ({ ...f, search: t || undefined }))}
+              />
+            </View>
+            {(filters.search?.length ?? 0) > 0 && (
+              <TouchableOpacity onPress={() => setFilters((f) => ({ ...f, search: undefined }))} style={{ borderWidth: 2, borderColor: colors.muted, paddingHorizontal: 12, height: 44, justifyContent: "center", marginLeft: 6 }}>
+                <T variant="body" style={{ color: colors.muted, fontSize: 16 }}>✕</T>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </Animated.View>
+      </Animated.View>
       )}
 
-      <TouchableOpacity style={{ position: "absolute", bottom: 24, right: 24, zIndex: 10, backgroundColor: colors.accent, width: 56, height: 56, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.accent }} onPress={() => router.push("/transaction-form")}>
+      <AnimatedFAB style={{ position: "absolute", bottom: 24, right: 24, zIndex: 10, backgroundColor: colors.accent, width: 56, height: 56, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.accent }} onPress={() => router.push("/transaction-form")}>
         <T variant="heading" style={{ color: colors.background, fontSize: 28 }}>+</T>
-      </TouchableOpacity>
+      </AnimatedFAB>
 
       {isLoading ? <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} /> : Object.keys(grouped).length === 0 ? (
         <T variant="body" style={{ color: colors.muted, paddingHorizontal: 16, marginTop: 40, textAlign: "center" }}>No transactions found. Tap + to add one.</T>

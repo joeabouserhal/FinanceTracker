@@ -8,6 +8,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { T } from "@/components/ThemedText";
 import { colors } from "@/theme/colors";
 
+const inputStyle = { backgroundColor: "#0A0A0A", borderWidth: 2, borderColor: "#555555", color: "#F5F1E8", paddingHorizontal: 14, paddingVertical: 14, fontSize: 15, fontFamily: "IBMPlexMono", marginTop: 8 };
+
 export default function SignIn() {
   const router = useRouter();
   const { signIn } = useAuth();
@@ -41,13 +43,13 @@ export default function SignIn() {
 
         <T variant="label">Email</T>
         <Controller control={control} name="email" render={({ field: { onChange, onBlur, value } }) => (
-          <TextInput style={inputStyle(errors.email)} placeholder="you@example.com" placeholderTextColor={colors.muted} autoCapitalize="none" keyboardType="email-address" autoComplete="email" onBlur={onBlur} onChangeText={onChange} value={value} />
+          <TextInput style={[inputStyle, errors.email ? { borderColor: colors.expense } : {}]} placeholder="you@example.com" placeholderTextColor={colors.muted} autoCapitalize="none" keyboardType="email-address" autoComplete="email" onBlur={onBlur} onChangeText={onChange} value={value} />
         )} />
         {errors.email && <T variant="body" style={{ color: colors.expense, fontSize: 12, marginTop: 4 }}>{errors.email.message}</T>}
 
         <T variant="label" style={{ marginTop: 16 }}>Password</T>
         <Controller control={control} name="password" render={({ field: { onChange, onBlur, value } }) => (
-          <TextInput style={inputStyle(errors.password)} placeholder="Your password" placeholderTextColor={colors.muted} secureTextEntry autoComplete="password" onBlur={onBlur} onChangeText={onChange} value={value} />
+          <TextInput style={[inputStyle, errors.password ? { borderColor: colors.expense } : {}]} placeholder="Your password" placeholderTextColor={colors.muted} secureTextEntry autoComplete="password" onBlur={onBlur} onChangeText={onChange} value={value} />
         )} />
         {errors.password && <T variant="body" style={{ color: colors.expense, fontSize: 12, marginTop: 4 }}>{errors.password.message}</T>}
 
@@ -62,7 +64,3 @@ export default function SignIn() {
     </KeyboardAvoidingView>
   );
 }
-
-const inputStyle = (error?: { message?: string }) => ({
-  backgroundColor: "#0A0A0A", borderWidth: 2, borderColor: error ? "#E8432E" : "#77746C", color: "#F5F1E8", paddingHorizontal: 14, paddingVertical: 12, fontSize: 16, fontFamily: "IBMPlexSans",
-});

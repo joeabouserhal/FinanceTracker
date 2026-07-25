@@ -235,7 +235,7 @@ export default function TransactionForm() {
             Cancel
           </T>
         </TouchableOpacity>
-        <T variant="title">
+        <T variant="heading" style={{ fontSize: 18 }}>
           {isEdit ? "Edit Transaction" : "New Transaction"}
         </T>
         <TouchableOpacity onPress={handleSave} disabled={saving}>

@@ -4,6 +4,7 @@ import * as LocalAuthentication from "expo-local-authentication";
 import { getBiometricEnabled } from "@/components/BrutalistToggle";
 import { T } from "@/components/ThemedText";
 import { colors } from "@/theme/colors";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 interface Props { children: ReactNode }
 
@@ -47,7 +48,7 @@ export function BiometricGate({ children }: Props) {
     const locked = !checking && !unlocked;
     return (
       <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: "flex-start", alignItems: "center", paddingTop: 120 }}>
-        <T variant="heading" style={{ fontSize: 48, marginBottom: locked ? 16 : 0 }}>🔒</T>
+        <MaterialCommunityIcons name="lock" size={48} color={colors.muted} style={{ marginBottom: locked ? 16 : 0 }} />
         <T variant="title" style={{ marginBottom: 24 }}>Locked</T>
         {locked && (
           <TouchableOpacity

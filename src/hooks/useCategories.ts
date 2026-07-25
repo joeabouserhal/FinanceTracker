@@ -35,10 +35,29 @@ export function useAddCategory() {
       if (error) throw error;
       return data as Category;
     },
-    onSuccess: (data) => {
-      if (isOffline()) {
-        qc.setQueriesData<Category[]>({ queryKey: KEY, exact: false }, (old) => old ? [...old, data] : [data]);
-      } else {
+    onMutate: async (input) => {
+      // Optimistic: inject immediately so UI updates before Supabase roundtrip
+      await qc.cancelQueries({ queryKey: KEY });
+      const previous = qc.getQueriesData<Category[]>({ queryKey: KEY, exact: false });
+      const optimistic: Category = {
+        id: `tmp_${Math.random().toString(36).slice(2, 9)}`,
+        user_id: "", created_at: new Date().toISOString(),
+        type: input.type, name: input.name, icon: input.icon,
+        color: input.color, is_default: false,
+      };
+      qc.setQueriesData<Category[]>({ queryKey: KEY, exact: false }, (old) => old ? [...old, optimistic] : [optimistic]);
+      return { previous };
+    },
+    onError: (_err, _input, context) => {
+      // Rollback optimistic update
+      if (context?.previous) {
+        for (const [queryKey, data] of context.previous) {
+          qc.setQueryData(queryKey, data);
+        }
+      }
+    },
+    onSettled: () => {
+      if (!isOffline()) {
         qc.invalidateQueries({ queryKey: KEY });
       }
     },

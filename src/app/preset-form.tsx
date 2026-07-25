@@ -59,7 +59,7 @@ export default function PresetForm() {
         <TouchableOpacity onPress={goBack}>
           <T variant="body" style={{ color: colors.muted, fontSize: 14 }}>Cancel</T>
         </TouchableOpacity>
-        <T variant="title">{isEdit ? "Edit Preset" : "New Preset"}</T>
+        <T variant="heading" style={{ fontSize: 18 }}>{isEdit ? "Edit Preset" : "New Preset"}</T>
         <TouchableOpacity onPress={handleSave} disabled={saving}>
           {saving ? <ActivityIndicator color={colors.accent} /> : <T variant="body" style={{ color: colors.accent, fontSize: 14, textTransform: "uppercase" }}>Save</T>}
         </TouchableOpacity>

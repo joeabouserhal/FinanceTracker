@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
-import { getQueue, dequeue, updateMutation, getIdMap, setIdMap, setSyncState, type QueuedMutation } from "@/lib/offline-queue";
+import { getQueue, dequeue, updateMutation, getIdMap, setIdMap, type QueuedMutation } from "@/lib/offline-queue";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { queryClient } from "@/lib/query-client";
 import { create } from "zustand";
@@ -19,12 +19,18 @@ export const useSyncStore = create<SyncStore>((set) => ({
   setState: (state) => set(state),
 }));
 
+async function refreshSession(): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.auth.refreshSession();
+    return !error && !!data.session;
+  } catch { return false; }
+}
+
 async function replayMutation(m: QueuedMutation): Promise<string | null> {
   // Resolve dependencies (client ID → server ID)
   let payload = m.payload;
   if (m.dependencies && m.dependencies.length > 0) {
     const idMap = await getIdMap();
-    // Replace dependency IDs in payload
     try {
       const json = JSON.stringify(payload);
       let resolved = json;
@@ -42,7 +48,6 @@ async function replayMutation(m: QueuedMutation): Promise<string | null> {
     const { client_id, ...cleanPayload } = payload;
     const { data, error } = await supabase.from(m.table).insert({ ...cleanPayload, user_id: user.id }).select().single();
     if (error) throw error;
-    // Store client → server ID mapping
     if (client_id && data?.id) {
       const idMap = await getIdMap();
       idMap[client_id] = data.id;
@@ -57,6 +62,10 @@ async function replayMutation(m: QueuedMutation): Promise<string | null> {
     if (error) throw error;
   }
   return null;
+}
+
+function isAuthError(msg: string): boolean {
+  return /not authenticated|jwt|token expired|refresh token/i.test(msg);
 }
 
 export function OfflineSyncProvider({ children }: { children: React.ReactNode }) {
@@ -82,9 +91,7 @@ export function OfflineSyncProvider({ children }: { children: React.ReactNode })
           await updateMutation(m.id, { attempts: m.attempts + 1 });
           const serverId = await replayMutation(m);
           await dequeue(m.id);
-          // Update cached queries if a reconciliation happened
           if (serverId && serverId !== m.payload.id) {
-            // Replace client ID with server ID in all caches
             queryClient.setQueriesData<any[]>(
               { queryKey: [m.table], exact: false },
               (old) => old?.map((item: any) => item.id === m.payload.client_id ? { ...item, id: serverId } : item) || []
@@ -94,10 +101,29 @@ export function OfflineSyncProvider({ children }: { children: React.ReactNode })
           hasFailures = true;
           lastError = e.message;
           await updateMutation(m.id, { lastError: e.message });
-          // Stop processing on fatal error (auth, etc.)
-          if (e.message?.includes("Not authenticated") || e.message?.includes("JWT")) {
-            break;
+
+          if (isAuthError(e.message)) {
+            const refreshed = await refreshSession();
+            if (refreshed) {
+              // Retry this mutation once after refresh
+              try {
+                await updateMutation(m.id, { attempts: m.attempts + 1, lastError: undefined });
+                const serverId = await replayMutation(m);
+                await dequeue(m.id);
+                if (serverId && serverId !== m.payload.id) {
+                  queryClient.setQueriesData<any[]>(
+                    { queryKey: [m.table], exact: false },
+                    (old) => old?.map((item: any) => item.id === m.payload.client_id ? { ...item, id: serverId } : item) || []
+                  );
+                }
+                hasFailures = false; // reset failure flag for this item
+                continue;
+              } catch (retryErr: any) {
+                await updateMutation(m.id, { lastError: `Auth refresh failed: ${retryErr.message}` });
+              }
+            }
           }
+          // Non-auth error or refresh failed — skip this mutation, continue with rest
         }
       }
 
@@ -109,7 +135,6 @@ export function OfflineSyncProvider({ children }: { children: React.ReactNode })
       });
 
       if (!hasFailures) {
-        // Full success — refresh all queries
         queryClient.invalidateQueries();
       }
 

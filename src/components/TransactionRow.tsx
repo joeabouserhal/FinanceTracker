@@ -1,4 +1,4 @@
-import { View } from "react-native";
+import { View, TouchableOpacity } from "react-native";
 import type { TransactionWithRelations } from "@/types/database";
 import { T } from "@/components/ThemedText";
 import { formatNumber } from "@/utils/currency";
@@ -22,7 +22,9 @@ export function TransactionRow({ transaction, onPress, isLast }: Props) {
   const sign = isIncome ? "+" : "-";
 
   return (
-    <View
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
       style={{
         flexDirection: "row",
         alignItems: "center",
@@ -32,7 +34,6 @@ export function TransactionRow({ transaction, onPress, isLast }: Props) {
         borderBottomColor: "#77746C",
         borderStyle: "dashed",
       }}
-      onTouchEnd={onPress}
     >
       <View style={{ width: 4, height: 40, backgroundColor: transaction.category?.color ?? colors.muted, marginRight: 12 }} />
       <View style={{ flex: 1 }}>
@@ -45,6 +46,6 @@ export function TransactionRow({ transaction, onPress, isLast }: Props) {
       <T variant="mono" style={{ color: isIncome ? colors.income : colors.expense, fontSize: 16 }}>
         {sign}{symbol}{formatNumber(Math.abs(amount), amount % 1 === 0 ? 0 : 2)}
       </T>
-    </View>
+    </TouchableOpacity>
   );
 }

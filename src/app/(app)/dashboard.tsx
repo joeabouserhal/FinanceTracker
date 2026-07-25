@@ -1,5 +1,6 @@
 import { T } from "@/components/ThemedText";
 import { TransactionRow } from "@/components/TransactionRow";
+import { AnimatedFAB } from "@/components/AnimatedFAB";
 import { useCurrencies } from "@/hooks/useCurrencies";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useTransactions } from "@/hooks/useTransactions";
@@ -7,7 +8,7 @@ import { useSyncStore } from "@/components/OfflineSyncProvider";
 import { colors } from "@/theme/colors";
 import { formatNumber } from "@/utils/currency";
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { ActivityIndicator, RefreshControl, ScrollView, TouchableOpacity, View, Modal } from "react-native";
 
 function monthKey(date: Date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`; }
@@ -30,7 +31,8 @@ export default function Dashboard() {
   const isCurrentMonth = viewMonth === monthKey(new Date());
   const bounds = monthBounds(viewMonth);
 
-  const monthTxns = useMemo(() => transactions?.filter((t) => t.date >= bounds.start && t.date <= bounds.end) ?? [], [transactions, bounds.start, bounds.end]);
+  const { data: monthTransactions } = useTransactions({ dateFrom: bounds.start, dateTo: bounds.end });
+  const monthTxns = monthTransactions ?? [];
 
   const currencyTotals: Record<string, { code: string; symbol: string; income: number; expense: number }> = {};
   for (const t of monthTxns) { const c = t.currency; if (!c) continue; if (!currencyTotals[c.id]) currencyTotals[c.id] = { code: c.code, symbol: c.symbol, income: 0, expense: 0 }; if (t.type === "income") currencyTotals[c.id].income += t.amount; else currencyTotals[c.id].expense += t.amount; }
@@ -64,12 +66,9 @@ export default function Dashboard() {
         </View>
       )}
 
-      <TouchableOpacity
-        style={{ position: "absolute", bottom: 24, right: 24, zIndex: 10, backgroundColor: colors.accent, width: 56, height: 56, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.accent }}
-        onPress={() => router.push("/transaction-form")}
-      >
+      <AnimatedFAB style={{ position: "absolute", bottom: 24, right: 24, zIndex: 10, backgroundColor: colors.accent, width: 56, height: 56, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: colors.accent }} onPress={() => router.push("/transaction-form")}>
         <T variant="heading" style={{ color: colors.background, fontSize: 28 }}>+</T>
-      </TouchableOpacity>
+      </AnimatedFAB>
 
       <ScrollView
         style={{ flex: 1 }}
@@ -122,6 +121,7 @@ export default function Dashboard() {
               return 0;
             }).map((c) => (
               <View key={c.code} style={{ marginBottom: 12 }}>
+                <T variant="label" style={{ fontSize: 9, marginBottom: 4 }}>{c.code}</T>
                 <View style={{ flexDirection: "row", height: 24, marginBottom: 4 }}>
                   {c.income > 0 && <View style={{ flex: c.income, backgroundColor: colors.income, height: "100%", justifyContent: "center", paddingHorizontal: 6 }}><T variant="mono" style={{ color: colors.background, fontSize: 11 }}>{Math.round(c.income / (c.income + c.expense) * 100)}%</T></View>}
                   {c.expense > 0 && <View style={{ flex: c.expense, backgroundColor: colors.expense, height: "100%", justifyContent: "center", alignItems: "flex-end", paddingHorizontal: 6 }}><T variant="mono" style={{ color: colors.background, fontSize: 11 }}>{Math.round(c.expense / (c.income + c.expense) * 100)}%</T></View>}
