@@ -8,6 +8,7 @@ import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { TransactionRow } from "@/components/TransactionRow";
 import { T } from "@/components/ThemedText";
 import { colors } from "@/theme/colors";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import type { TransactionWithRelations } from "@/types/database";
 
 type DateRange = "all" | "today" | "month" | "year" | "custom";
@@ -109,7 +110,7 @@ export default function TransactionsList() {
           <View style={{ paddingHorizontal: 16, marginBottom: 10 }}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <TouchableOpacity onPress={openCatFilter} style={{ borderWidth: 2, borderColor: (filters.categoryIds?.length ?? 0) > 0 ? colors.accent : colors.muted, paddingHorizontal: 10, paddingVertical: 6, marginRight: 6, alignItems: "center", justifyContent: "center", backgroundColor: (filters.categoryIds?.length ?? 0) > 0 ? colors.accent : "transparent" }}>
-                <T variant="label" style={{ color: (filters.categoryIds?.length ?? 0) > 0 ? colors.background : colors.muted, fontSize: 12 }}>Filter</T>
+                <MaterialCommunityIcons name="filter-variant" size={14} color={(filters.categoryIds?.length ?? 0) > 0 ? colors.background : colors.muted} />
               </TouchableOpacity>
               <FilterChip label="All" active={!filters.categoryId && !filters.categoryIds} onPress={() => setFilters((f) => ({ ...f, categoryId: undefined, categoryIds: undefined }))} />
               {typeCats?.map((c) => <FilterChip key={c.id} label={c.name} active={filters.categoryId === c.id} onPress={() => setFilters((f) => ({ ...f, categoryId: f.categoryId === c.id ? undefined : c.id, categoryIds: undefined }))} />)}

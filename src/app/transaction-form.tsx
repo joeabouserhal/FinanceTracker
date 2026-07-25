@@ -1,5 +1,6 @@
 import { ThemedAlert, ThemedConfirm } from "@/components/ThemedAlert";
 import { T } from "@/components/ThemedText";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAccounts } from "@/hooks/useAccounts";
 import { useCategories } from "@/hooks/useCategories";
 import { useCurrencies } from "@/hooks/useCurrencies";
@@ -374,7 +375,7 @@ export default function TransactionForm() {
             onPress={() => setCatSearchVisible(true)}
             style={{ borderWidth: 2, borderColor: colors.muted, paddingHorizontal: 10, paddingVertical: 6, marginRight: 8, alignItems: "center", justifyContent: "center" }}
           >
-            <T variant="label" style={{ color: colors.muted, fontSize: 13 }}>🔍</T>
+            <MaterialCommunityIcons name="magnify" size={16} color={colors.ink} />
           </TouchableOpacity>
           {filteredCategories.map((c) => (
             <TouchableOpacity
