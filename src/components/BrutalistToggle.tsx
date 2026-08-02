@@ -1,18 +1,6 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import { View, TouchableOpacity } from "react-native";
 import { T } from "@/components/ThemedText";
-import { colors } from "@/theme/colors";
-
-const STORAGE_KEY = "biometric_enabled";
-
-export async function getBiometricEnabled(): Promise<boolean> {
-  const val = await AsyncStorage.getItem(STORAGE_KEY);
-  return val === "true"; // default to false
-}
-
-export async function setBiometricEnabled(enabled: boolean) {
-  await AsyncStorage.setItem(STORAGE_KEY, String(enabled));
-}
+import { useTheme } from "@/theme/store";
 
 interface Props {
   value: boolean;
@@ -21,6 +9,7 @@ interface Props {
 }
 
 export function BrutalistToggle({ value, onToggle, label }: Props) {
+  const theme = useTheme();
   return (
     <TouchableOpacity
       onPress={onToggle}
@@ -32,8 +21,8 @@ export function BrutalistToggle({ value, onToggle, label }: Props) {
           width: 44,
           height: 24,
           borderWidth: 2,
-          borderColor: value ? colors.accent : colors.muted,
-          backgroundColor: value ? colors.accent : "transparent",
+          borderColor: value ? theme.accent : theme.muted,
+          backgroundColor: value ? theme.accent : "transparent",
           justifyContent: "center",
           paddingHorizontal: 2,
         }}
@@ -42,7 +31,7 @@ export function BrutalistToggle({ value, onToggle, label }: Props) {
           style={{
             width: 16,
             height: 16,
-            backgroundColor: value ? colors.background : colors.muted,
+            backgroundColor: value ? theme.background : theme.muted,
             alignSelf: value ? "flex-end" : "flex-start",
           }}
         />

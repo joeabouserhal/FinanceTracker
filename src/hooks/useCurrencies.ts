@@ -1,18 +1,35 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { enqueue } from "@/lib/offline-queue";
-import { useNetworkStatus } from "@/hooks/useNetworkStatus";
+import { enqueue, isTempId } from "@/lib/offline-queue";
+import { createCrudApi, isOffline } from "@/lib/offline-crud";
+import { isNetworkError } from "@/utils/errors";
 import type { Currency, CurrencyInsert, CurrencyUpdate } from "@/types/database";
 
 const KEY = ["currencies"] as const;
 
-function isOffline() { return !useNetworkStatus.getState().isConnected; }
+const currenciesApi = createCrudApi<Currency, CurrencyInsert, CurrencyUpdate>({
+  table: "currencies",
+  queryKey: KEY,
+  optimistic: (input, clientId, now) => ({
+    id: clientId,
+    user_id: "",
+    code: input.code,
+    symbol: input.symbol,
+    name: input.name,
+    is_default: input.is_default ?? false,
+    created_at: now,
+  }),
+});
 
 export function useCurrencies() {
   return useQuery({
     queryKey: KEY,
     queryFn: async () => {
-      const { data, error } = await supabase.from("currencies").select("*").order("is_default", { ascending: false }).order("code");
+      const { data, error } = await supabase
+        .from("currencies")
+        .select("*")
+        .order("is_default", { ascending: false })
+        .order("code");
       if (error) throw error;
       return data as Currency[];
     },
@@ -20,76 +37,81 @@ export function useCurrencies() {
 }
 
 export function useAddCurrency() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: CurrencyInsert) => {
-      if (isOffline()) {
-        await enqueue({ table: "currencies", action: "insert", payload: input });
-        return { id: `offline_${Date.now()}`, user_id: "", created_at: "", ...input } as Currency;
-      }
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-      const { data, error } = await supabase.from("currencies").insert({ ...input, user_id: user.id }).select().single();
-      if (error) throw error;
-      return data as Currency;
-    },
-    onSuccess: (data) => {
-      if (isOffline()) {
-        qc.setQueriesData<Currency[]>({ queryKey: KEY, exact: false }, (old) => old ? [...old, data] : [data]);
-      } else {
-        qc.invalidateQueries({ queryKey: KEY });
-      }
-    },
-  });
-}
-
-export function useUpdateCurrency() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, ...updates }: CurrencyUpdate & { id: string }) => {
-      if (isOffline()) {
-        await enqueue({ table: "currencies", action: "update", payload: { id, data: updates } });
-        return { id } as Currency;
-      }
-      const { data, error } = await supabase.from("currencies").update(updates).eq("id", id).select().single();
-      if (error) throw error;
-      return data as Currency;
-    },
-    onSuccess: () => {
-      if (!isOffline()) qc.invalidateQueries({ queryKey: KEY });
-    },
-  });
-}
-
-export function useSetDefaultCurrency() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      if (isOffline()) return;
-      await supabase.from("currencies").update({ is_default: false }).eq("is_default", true);
-      const { error } = await supabase.from("currencies").update({ is_default: true }).eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      if (!isOffline()) qc.invalidateQueries({ queryKey: KEY });
-    },
-  });
+  return currenciesApi.useAdd();
 }
 
 export function useDeleteCurrency() {
+  return currenciesApi.useRemove("delete");
+}
+
+/**
+ * Set a currency as default. Offline this enqueues two ordered updates
+ * (clear old default, set new one) instead of silently dropping the change.
+ */
+export function useSetDefaultCurrency() {
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      if (isOffline()) {
-        await enqueue({ table: "currencies", action: "delete", payload: { id } });
-        return;
+
+  const queueDefaultChange = async (id: string, previousDefaultId: string | undefined) => {
+    const ops: Promise<void>[] = [];
+    if (previousDefaultId && previousDefaultId !== id) {
+      ops.push(
+        enqueue({
+          table: "currencies",
+          action: "update",
+          payload: { id: previousDefaultId, data: { is_default: false } },
+          dependencies: isTempId(previousDefaultId) ? [previousDefaultId] : [],
+        }),
+      );
+    }
+    ops.push(
+      enqueue({
+        table: "currencies",
+        action: "update",
+        payload: { id, data: { is_default: true } },
+        dependencies: isTempId(id) ? [id] : [],
+      }),
+    );
+    await Promise.all(ops);
+    return { id, optimistic: true, previousDefaultId };
+  };
+
+  return useMutation<{ id: string; optimistic: boolean; previousDefaultId?: string }, Error, string>({
+    mutationFn: async (id) => {
+      const rows = qc
+        .getQueriesData<Currency[]>({ queryKey: KEY, exact: false })
+        .flatMap(([, data]) => data ?? []);
+      const previousDefaultId = rows.find((c) => c.is_default)?.id;
+      // Temp IDs (optimistic rows, e.g. set-default in the reconnect→drain
+      // window) must go through the queue — a direct update would match
+      // nothing server-side and the follow-up invalidate would wipe the row.
+      if (isOffline() || isTempId(id) || (previousDefaultId !== undefined && isTempId(previousDefaultId))) {
+        return queueDefaultChange(id, previousDefaultId);
       }
-      const { error } = await supabase.from("currencies").delete().eq("id", id);
-      if (error) throw error;
+      try {
+        const { error: clearError } = await supabase
+          .from("currencies")
+          .update({ is_default: false })
+          .eq("is_default", true);
+        if (clearError) throw clearError;
+        const { error } = await supabase.from("currencies").update({ is_default: true }).eq("id", id);
+        if (error) throw error;
+        return { id, optimistic: false };
+      } catch (error) {
+        if (isNetworkError(error)) return queueDefaultChange(id, previousDefaultId);
+        throw error;
+      }
     },
-    onSuccess: (_data, id) => {
-      if (isOffline()) {
-        qc.setQueriesData<Currency[]>({ queryKey: KEY, exact: false }, (old) => (old ?? []).filter((c: any) => c.id !== id));
+    onSuccess: (result) => {
+      if (result.optimistic) {
+        qc.setQueriesData<Currency[]>({ queryKey: KEY, exact: false }, (old) =>
+          (old ?? []).map((c) =>
+            c.id === result.id
+              ? { ...c, is_default: true }
+              : c.id === result.previousDefaultId
+                ? { ...c, is_default: false }
+                : c,
+          ),
+        );
       } else {
         qc.invalidateQueries({ queryKey: KEY });
       }

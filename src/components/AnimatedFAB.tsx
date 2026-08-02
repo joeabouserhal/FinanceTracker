@@ -1,14 +1,14 @@
-import { useRef } from "react";
-import { Animated, TouchableOpacity } from "react-native";
+import { useState } from "react";
+import { Animated, TouchableOpacity, type StyleProp, type ViewStyle } from "react-native";
 
 interface Props {
   onPress: () => void;
   children: React.ReactNode;
-  style?: any;
+  style?: StyleProp<ViewStyle>;
 }
 
 export function AnimatedFAB({ onPress, children, style }: Props) {
-  const scale = useRef(new Animated.Value(1)).current;
+  const [scale] = useState(() => new Animated.Value(1));
 
   const handlePressIn = () => {
     Animated.spring(scale, { toValue: 0.85, useNativeDriver: true, speed: 30, bounciness: 8 }).start();

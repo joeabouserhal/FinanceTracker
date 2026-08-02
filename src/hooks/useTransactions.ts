@@ -1,18 +1,16 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
-import { enqueue } from "@/lib/offline-queue";
-import { useNetworkStatus } from "@/hooks/useNetworkStatus";
+import { queryClient } from "@/lib/query-client";
+import { createCrudApi } from "@/lib/offline-crud";
 import type {
-  Transaction,
+  Category,
+  Currency,
   TransactionInsert,
   TransactionUpdate,
   TransactionWithRelations,
 } from "@/types/database";
 
 const KEY = ["transactions"] as const;
-
-function isOffline() { return !useNetworkStatus.getState().isConnected; }
-function genId(): string { return `tmp_${Math.random().toString(36).slice(2, 11)}`; }
 
 export interface TransactionFilters {
   dateFrom?: string;
@@ -24,6 +22,40 @@ export interface TransactionFilters {
   type?: "income" | "expense";
   search?: string;
 }
+
+const transactionsApi = createCrudApi<TransactionWithRelations, TransactionInsert, TransactionUpdate>({
+  table: "transactions",
+  queryKey: KEY,
+  insertPosition: "prepend",
+  touchUpdatedAt: true,
+  optimistic: (input, clientId, now) => {
+    // Enrich the optimistic row with the joined category/currency from cache.
+    const categories = queryClient
+      .getQueriesData<Category[]>({ queryKey: ["categories"], exact: false })
+      .flatMap(([, data]) => data ?? []);
+    const currencies = queryClient
+      .getQueriesData<Currency[]>({ queryKey: ["currencies"], exact: false })
+      .flatMap(([, data]) => data ?? []);
+    return {
+      id: clientId,
+      user_id: "",
+      type: input.type,
+      amount: input.amount,
+      currency_id: input.currency_id,
+      category_id: input.category_id,
+      account_id: input.account_id ?? null,
+      date: input.date,
+      title: input.title ?? null,
+      notes: input.notes ?? null,
+      preset_id: input.preset_id ?? null,
+      created_at: now,
+      updated_at: now,
+      category: categories.find((c) => c.id === input.category_id),
+      currency: currencies.find((c) => c.id === input.currency_id),
+      account: null,
+    };
+  },
+});
 
 export function useTransactions(filters?: TransactionFilters) {
   return useQuery({
@@ -52,109 +84,13 @@ export function useTransactions(filters?: TransactionFilters) {
 }
 
 export function useAddTransaction() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (input: TransactionInsert) => {
-      if (isOffline()) {
-        const clientId = genId();
-        await enqueue({
-          table: "transactions",
-          action: "insert",
-          payload: { ...input, client_id: clientId },
-          dependencies: [input.category_id, input.currency_id].filter((id) => id?.startsWith("tmp_")),
-        });
-        const now = new Date().toISOString();
-        return {
-          id: clientId, user_id: "", type: input.type, amount: input.amount,
-          currency_id: input.currency_id, category_id: input.category_id,
-          account_id: input.account_id, date: input.date, title: input.title ?? null,
-          notes: input.notes, preset_id: input.preset_id,
-          created_at: now, updated_at: now,
-        } as Transaction;
-      }
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error("Not authenticated");
-      const { data, error } = await supabase
-        .from("transactions")
-        .insert({ ...input, user_id: user.id })
-        .select()
-        .single();
-      if (error) throw error;
-      return data as Transaction;
-    },
-    onSuccess: (data) => {
-      if (String(data.id).startsWith("tmp_")) {
-        const allCats = qc.getQueriesData<any[]>({ queryKey: ["categories"], exact: false });
-        const allCurs = qc.getQueriesData<any[]>({ queryKey: ["currencies"], exact: false });
-        const cat = allCats.flatMap(([, d]) => d ?? []).find((c: any) => c.id === data.category_id);
-        const cur = allCurs.flatMap(([, d]) => d ?? []).find((c: any) => c.id === data.currency_id);
-
-        const fake: TransactionWithRelations = {
-          ...data,
-          category: cat ?? null,
-          currency: cur ?? null,
-          account: null,
-          created_at: data.created_at || new Date().toISOString(),
-          updated_at: data.updated_at || new Date().toISOString(),
-        };
-        qc.setQueriesData<TransactionWithRelations[]>(
-          { queryKey: KEY, exact: false },
-          (old) => (old ? [fake, ...old] : [fake])
-        );
-      } else {
-        qc.invalidateQueries({ queryKey: KEY });
-      }
-    },
-  });
+  return transactionsApi.useAdd();
 }
 
 export function useUpdateTransaction() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ id, ...updates }: TransactionUpdate & { id: string }) => {
-      if (isOffline()) {
-        await enqueue({ table: "transactions", action: "update", payload: { id, data: { ...updates, updated_at: new Date().toISOString() } } });
-        return { id } as Transaction;
-      }
-      const { data, error } = await supabase
-        .from("transactions")
-        .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq("id", id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data as Transaction;
-    },
-    onSuccess: (data, variables) => {
-      if (isOffline()) {
-        const { id, ...updates } = variables;
-        qc.setQueriesData<TransactionWithRelations[]>(
-          { queryKey: KEY, exact: false },
-          (old) => old?.map((t) => t.id === id ? { ...t, ...updates } : t) ?? []
-        );
-      } else {
-        qc.invalidateQueries({ queryKey: KEY });
-      }
-    },
-  });
+  return transactionsApi.useUpdate();
 }
 
 export function useDeleteTransaction() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      if (isOffline()) {
-        await enqueue({ table: "transactions", action: "delete", payload: { id } });
-        return;
-      }
-      const { error } = await supabase.from("transactions").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: (_data, id) => {
-      qc.setQueriesData<TransactionWithRelations[]>(
-        { queryKey: KEY, exact: false },
-        (old) => old?.filter((t) => t.id !== id) ?? []
-      );
-    },
-  });
+  return transactionsApi.useRemove("delete");
 }

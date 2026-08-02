@@ -9,7 +9,8 @@
     "scheme": "financetracker",
     "userInterfaceStyle": "dark",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/expo.icon.png",
+      "bundleIdentifier": "com.joeabouserhal.financetracker"
     },
     "android": {
       "softwareKeyboardLayoutMode": "resize",
@@ -20,7 +21,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.joeabouserhal.FinanceTracker"
+      "package": "com.joeabouserhal.financetracker"
     },
     "web": {
       "output": "static",
@@ -42,7 +43,8 @@
         {
           "faceIDPermission": "Allow Finance Tracker to use Face ID to unlock the app."
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

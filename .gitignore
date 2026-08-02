@@ -49,3 +49,8 @@ example
 # build artifacts
 build/
 build-*.apk
+# Reasonix (agent harness tooling)
+.reasonix/
+.agents/
+reasonix.toml
+skills-lock.json

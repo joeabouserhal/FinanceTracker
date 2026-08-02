@@ -1,23 +1,24 @@
-import { useState, useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { View, TouchableOpacity, AppState } from "react-native";
 import * as LocalAuthentication from "expo-local-authentication";
-import { getBiometricEnabled } from "@/components/BrutalistToggle";
+import { useBiometricStore } from "@/lib/biometric-store";
 import { T } from "@/components/ThemedText";
-import { colors } from "@/theme/colors";
+import { useTheme } from "@/theme/store";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 
 interface Props { children: ReactNode }
 
 export function BiometricGate({ children }: Props) {
+  const theme = useTheme();
+  const enabled = useBiometricStore((s) => s.enabled);
+  const ready = useBiometricStore((s) => s.ready);
   const [unlocked, setUnlocked] = useState(false);
-  const [enabled, setEnabled] = useState(true);
   const [checking, setChecking] = useState(true);
 
   useEffect(() => {
+    if (!ready) return;
     (async () => {
-      const biometricOn = await getBiometricEnabled();
-      setEnabled(biometricOn);
-      if (!biometricOn) { setUnlocked(true); setChecking(false); return; }
+      if (!enabled) { setUnlocked(true); setChecking(false); return; }
 
       const hw = await LocalAuthentication.hasHardwareAsync();
       const enrolled = await LocalAuthentication.isEnrolledAsync();
@@ -27,13 +28,12 @@ export function BiometricGate({ children }: Props) {
       setUnlocked(result.success);
       setChecking(false);
     })();
-  }, []);
+  }, [ready, enabled]);
 
   useEffect(() => {
     const sub = AppState.addEventListener("change", async (state) => {
       if (state === "active" && unlocked) {
-        const biometricOn = await getBiometricEnabled();
-        if (!biometricOn) return;
+        if (!useBiometricStore.getState().enabled) return;
         const enrolled = await LocalAuthentication.isEnrolledAsync();
         if (!enrolled) return;
         setUnlocked(false);
@@ -47,8 +47,8 @@ export function BiometricGate({ children }: Props) {
   if (checking || !unlocked) {
     const locked = !checking && !unlocked;
     return (
-      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: "flex-start", alignItems: "center", paddingTop: 120 }}>
-        <MaterialCommunityIcons name="lock" size={48} color={colors.muted} style={{ marginBottom: locked ? 16 : 0 }} />
+      <View style={{ flex: 1, backgroundColor: theme.background, justifyContent: "flex-start", alignItems: "center", paddingTop: 120 }}>
+        <MaterialCommunityIcons name="lock" size={48} color={theme.muted} style={{ marginBottom: locked ? 16 : 0 }} />
         <T variant="title" style={{ marginBottom: 24 }}>Locked</T>
         {locked && (
           <TouchableOpacity
@@ -56,9 +56,9 @@ export function BiometricGate({ children }: Props) {
               const result = await LocalAuthentication.authenticateAsync({ promptMessage: "Unlock Finance Tracker" });
               setUnlocked(result.success);
             }}
-            style={{ borderWidth: 2, borderColor: colors.accent, paddingHorizontal: 32, paddingVertical: 14 }}
+            style={{ borderWidth: 2, borderColor: theme.accent, paddingHorizontal: 32, paddingVertical: 14 }}
           >
-            <T variant="body" style={{ color: colors.accent, textTransform: "uppercase", fontSize: 14 }}>Unlock</T>
+            <T variant="body" style={{ color: theme.accent, textTransform: "uppercase", fontSize: 14 }}>Unlock</T>
           </TouchableOpacity>
         )}
       </View>

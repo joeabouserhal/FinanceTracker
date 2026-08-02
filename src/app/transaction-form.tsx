@@ -1,5 +1,6 @@
 import { ThemedAlert, ThemedConfirm } from "@/components/ThemedAlert";
 import { T } from "@/components/ThemedText";
+import { DateField } from "@/components/DateField";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useAccounts } from "@/hooks/useAccounts";
 import { useCategories } from "@/hooks/useCategories";
@@ -11,10 +12,13 @@ import {
   useTransactions,
   useUpdateTransaction,
 } from "@/hooks/useTransactions";
-import { colors } from "@/theme/colors";
+import { useTheme } from "@/theme/store";
+import { useInputStyle, useModalSearchStyle } from "@/theme/styles";
+import { getErrorMessage } from "@/utils/errors";
+import { todayISO } from "@/utils/date";
 import type { TransactionInsert } from "@/types/database";
-import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { useCallback, useRef, useState } from "react";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { useRef, useState } from "react";
 import {
   View,
   TextInput,
@@ -23,12 +27,7 @@ import {
   ActivityIndicator,
   Modal,
   KeyboardAvoidingView,
-  Platform,
 } from "react-native";
-
-function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function addCommas(val: string): string {
   if (!val) return "";
@@ -43,6 +42,9 @@ function addCommas(val: string): string {
 
 export default function TransactionForm() {
   const router = useRouter();
+  const theme = useTheme();
+  const inputStyle = useInputStyle();
+  const modalSearchStyle = useModalSearchStyle();
   const { id } = useLocalSearchParams<{ id?: string }>();
   const isEdit = !!id;
 
@@ -77,6 +79,9 @@ export default function TransactionForm() {
   const [currencyId, setCurrencyId] = useState(
     existing?.currency_id ?? currencies?.find((c) => c.is_default)?.id ?? "",
   );
+  // Currencies may load after this screen mounts — derive the effective
+  // selection in render so a fresh form still defaults to the default currency.
+  const effectiveCurrencyId = currencyId || currencies?.find((c) => c.is_default)?.id || "";
   const [categoryId, setCategoryId] = useState(existing?.category_id ?? "");
   const [accountId, setAccountId] = useState(existing?.account_id ?? "");
   const [date, setDate] = useState(existing?.date ?? todayISO());
@@ -96,6 +101,15 @@ export default function TransactionForm() {
     setAlertVisible(true);
   };
 
+  const chipStyle = (active: boolean) => ({
+    borderWidth: 2,
+    borderColor: active ? theme.accent : theme.muted,
+    backgroundColor: active ? theme.accent : "transparent",
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    marginRight: 8,
+  });
+
   const filteredCategories =
     categories?.filter((c) => c.type === type) ?? [];
 
@@ -109,35 +123,15 @@ export default function TransactionForm() {
   };
 
   const activeAccounts = accounts?.filter((a) => !a.archived) ?? [];
-  const activeCurrency = currencies?.find((c) => c.id === currencyId);
+  const activeCurrency = currencies?.find((c) => c.id === effectiveCurrencyId);
 
-  // Reset form when opening a new transaction, populate when editing
-  useFocusEffect(
-    useCallback(() => {
-      if (!isEdit) {
-        setAmount("");
-        setCategoryId("");
-        setAccountId("");
-        setNotes("");
-        setTitle("");
-      } else if (existing) {
-        setAmount(addCommas(String(existing.amount / 100)));
-        setType(existing.type);
-        setCurrencyId(existing.currency_id);
-        setCategoryId(existing.category_id);
-        setAccountId(existing.account_id ?? "");
-        setDate(existing.date);
-        setNotes(existing.notes ?? "");
-        setTitle(existing.title ?? "");
-      }
-    }, [isEdit, existing?.id, existing?.amount, existing?.type, existing?.category_id, existing?.notes, existing?.date, existing?.title])
-  );
+  // Form state is initialized once from `existing` — expo-router remounts this
+  // screen on every navigation, so no focus-sync effect is needed.
 
   const handleAmountChange = (text: string) => {
-    // Count commas before cursor in old value
+    // Remember cursor position in the old value for adjustment below
     const oldText = amount;
     const oldCursor = cursorPos.current;
-    const commasBeforeCursorOld = (oldText.slice(0, oldCursor).match(/,/g) || []).length;
 
     // Format new text
     const formatted = addCommas(text);
@@ -173,7 +167,7 @@ export default function TransactionForm() {
 
   const handleSave = async () => {
     const rawAmount = getRawAmount();
-    if (!rawAmount || !currencyId || !categoryId || !title.trim()) {
+    if (!rawAmount || !effectiveCurrencyId || !categoryId || !title.trim()) {
       showAlert("Missing fields", "Amount, currency, category, and title are required.");
       return;
     }
@@ -187,7 +181,7 @@ export default function TransactionForm() {
     const data: TransactionInsert = {
       type,
       amount: amountCents,
-      currency_id: currencyId,
+      currency_id: effectiveCurrencyId,
       category_id: categoryId,
       account_id: accountId || null,
       date,
@@ -204,8 +198,8 @@ export default function TransactionForm() {
         await addMutation.mutateAsync(data);
       }
       goBack();
-    } catch (e: any) {
-      showAlert("Error", e.message);
+    } catch (e) {
+      showAlert("Error", getErrorMessage(e));
     } finally {
       setSaving(false);
     }
@@ -217,7 +211,7 @@ export default function TransactionForm() {
   };
 
   return (
-    <View style={{ flex: 1, backgroundColor: colors.background }}>
+    <View style={{ flex: 1, backgroundColor: theme.background }}>
       {/* Sticky Header */}
       <View
         style={{
@@ -227,11 +221,11 @@ export default function TransactionForm() {
           paddingHorizontal: 16,
           paddingTop: 48,
           paddingBottom: 12,
-          backgroundColor: colors.background,
+          backgroundColor: theme.background,
         }}
       >
         <TouchableOpacity onPress={goBack}>
-          <T variant="body" style={{ color: colors.muted, fontSize: 14 }}>
+          <T variant="body" style={{ color: theme.muted, fontSize: 14 }}>
             Cancel
           </T>
         </TouchableOpacity>
@@ -240,12 +234,12 @@ export default function TransactionForm() {
         </T>
         <TouchableOpacity onPress={handleSave} disabled={saving}>
           {saving ? (
-            <ActivityIndicator color={colors.accent} />
+            <ActivityIndicator color={theme.accent} />
           ) : (
             <T
               variant="body"
               style={{
-                color: colors.accent,
+                color: theme.accent,
                 fontSize: 14,
                 textTransform: "uppercase",
               }}
@@ -271,15 +265,15 @@ export default function TransactionForm() {
               style={{
                 flex: 1,
                 borderWidth: 2,
-                borderColor: type === t ? (t === "income" ? colors.income : colors.expense) : colors.muted,
-                backgroundColor: type === t ? (t === "income" ? colors.income : colors.expense) : "transparent",
+                borderColor: type === t ? (t === "income" ? theme.income : theme.expense) : theme.muted,
+                backgroundColor: type === t ? (t === "income" ? theme.income : theme.expense) : "transparent",
                 paddingVertical: 10,
                 alignItems: "center",
                 marginRight: t === "expense" ? 4 : 0,
                 marginLeft: t === "income" ? 4 : 0,
               }}
             >
-              <T variant="body" style={{ color: type === t ? colors.background : colors.muted, fontSize: 14, textTransform: "uppercase", fontWeight: "700" }}>
+              <T variant="body" style={{ color: type === t ? theme.background : theme.muted, fontSize: 14, textTransform: "uppercase", fontWeight: "700" }}>
                 {t}
               </T>
             </TouchableOpacity>
@@ -291,23 +285,23 @@ export default function TransactionForm() {
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 16 }}>
             {presets.map((p) => (
               <TouchableOpacity key={p.id} onPress={() => applyPreset(p.id)} style={chipStyle(false)}>
-                <T variant="label" style={{ color: colors.muted, fontSize: 12 }}>{p.name}</T>
+                <T variant="label" style={{ color: theme.muted, fontSize: 12 }}>{p.name}</T>
               </TouchableOpacity>
             ))}
           </ScrollView>
         )}
 
         {/* Amount — Hero */}
-        <View style={{ borderTopWidth: 1, borderBottomWidth: 1, borderColor: "#1A1A1A", paddingBottom: 16, paddingTop: 12, marginBottom: 16 }}>
+        <View style={{ borderTopWidth: 1, borderBottomWidth: 1, borderColor: theme.border, paddingBottom: 16, paddingTop: 12, marginBottom: 16 }}>
           <View style={{ flexDirection: "row", alignItems: "baseline" }}>
-            <T variant="mono" style={{ fontSize: 18, color: "#444", marginRight: 6 }}>
+            <T variant="mono" style={{ fontSize: 18, color: theme.muted, marginRight: 6 }}>
               {activeCurrency?.symbol ?? "$"}
             </T>
             <TextInput
               ref={amountRef}
-              style={{ color: "#F5F1E8", fontSize: 48, fontFamily: "IBMPlexMono", flex: 1, padding: 0 }}
+              style={{ color: theme.ink, fontSize: 48, fontFamily: "IBMPlexMono", flex: 1, padding: 0 }}
               placeholder="0"
-              placeholderTextColor="#333"
+              placeholderTextColor={theme.placeholder}
               keyboardType="numeric"
               value={amount}
               onChangeText={handleAmountChange}
@@ -333,13 +327,13 @@ export default function TransactionForm() {
             <TouchableOpacity
               key={c.id}
               onPress={() => setCurrencyId(c.id)}
-              style={chipStyle(currencyId === c.id)}
+              style={chipStyle(effectiveCurrencyId === c.id)}
             >
               <T
                 variant="label"
                 style={{
                   color:
-                    currencyId === c.id ? colors.background : colors.muted,
+                    effectiveCurrencyId === c.id ? theme.background : theme.muted,
                   fontSize: 13,
                 }}
               >
@@ -354,7 +348,7 @@ export default function TransactionForm() {
         <TextInput
           style={[inputStyle, { marginTop: 8, marginBottom: 20 }]}
           placeholder="e.g. Weekly groceries"
-          placeholderTextColor={colors.muted}
+          placeholderTextColor={theme.muted}
           value={title}
           onChangeText={setTitle}
         />
@@ -362,7 +356,7 @@ export default function TransactionForm() {
         {/* Category */}
         <T variant="label">Category</T>
         {!categories || filteredCategories.length === 0 ? (
-          <T variant="body" style={{ color: colors.muted, fontSize: 12, marginTop: 8, marginBottom: 20 }}>
+          <T variant="body" style={{ color: theme.muted, fontSize: 12, marginTop: 8, marginBottom: 20 }}>
             {!categories ? "Loading..." : "No categories for this type. Go to Settings to add one."}
           </T>
         ) : (
@@ -373,9 +367,9 @@ export default function TransactionForm() {
         >
           <TouchableOpacity
             onPress={() => setCatSearchVisible(true)}
-            style={{ borderWidth: 2, borderColor: colors.muted, paddingHorizontal: 10, paddingVertical: 6, marginRight: 8, alignItems: "center", justifyContent: "center" }}
+            style={{ borderWidth: 2, borderColor: theme.muted, paddingHorizontal: 10, paddingVertical: 6, marginRight: 8, alignItems: "center", justifyContent: "center" }}
           >
-            <MaterialCommunityIcons name="magnify" size={16} color={colors.ink} />
+            <MaterialCommunityIcons name="magnify" size={16} color={theme.ink} />
           </TouchableOpacity>
           {filteredCategories.map((c) => (
             <TouchableOpacity
@@ -392,7 +386,7 @@ export default function TransactionForm() {
                 variant="label"
                 style={{
                   color:
-                    categoryId === c.id ? colors.background : colors.muted,
+                    categoryId === c.id ? theme.background : theme.muted,
                   fontSize: 13,
                 }}
               >
@@ -417,7 +411,7 @@ export default function TransactionForm() {
           {activeAccounts.length === 0 ? (
             <T
               variant="body"
-              style={{ color: colors.muted, fontSize: 12 }}
+              style={{ color: theme.muted, fontSize: 12 }}
             >
               No accounts — go to Settings to add one
             </T>
@@ -430,7 +424,7 @@ export default function TransactionForm() {
                 <T
                   variant="label"
                   style={{
-                    color: !accountId ? colors.background : colors.muted,
+                    color: !accountId ? theme.background : theme.muted,
                     fontSize: 13,
                   }}
                 >
@@ -448,8 +442,8 @@ export default function TransactionForm() {
                     style={{
                       color:
                         accountId === a.id
-                          ? colors.background
-                          : colors.muted,
+                          ? theme.background
+                          : theme.muted,
                       fontSize: 13,
                     }}
                   >
@@ -465,20 +459,14 @@ export default function TransactionForm() {
         <View
           style={{
             height: 1,
-            backgroundColor: "#1A1A1A",
+            backgroundColor: theme.border,
             marginBottom: 20,
           }}
         />
 
         {/* Date */}
         <T variant="label">Date</T>
-        <TextInput
-          style={inputStyle}
-          placeholder="YYYY-MM-DD"
-          placeholderTextColor={colors.muted}
-          value={date}
-          onChangeText={setDate}
-        />
+        <DateField value={date} onChange={setDate} style={{ marginTop: 8 }} />
 
         {/* Notes */}
         <T variant="label" style={{ marginTop: 16 }}>
@@ -487,7 +475,7 @@ export default function TransactionForm() {
         <TextInput
           style={[inputStyle, { minHeight: 60, marginTop: 8 }]}
           placeholder="What was this for?"
-          placeholderTextColor={colors.muted}
+          placeholderTextColor={theme.muted}
           multiline
           value={notes}
           onChangeText={setNotes}
@@ -499,7 +487,7 @@ export default function TransactionForm() {
             <View
               style={{
                 height: 1,
-                backgroundColor: "#1A1A1A",
+                backgroundColor: theme.border,
                 marginTop: 32,
                 marginBottom: 16,
               }}
@@ -508,7 +496,7 @@ export default function TransactionForm() {
               onPress={handleDelete}
               style={{
                 borderWidth: 2,
-                borderColor: colors.expense,
+                borderColor: theme.expense,
                 paddingVertical: 12,
                 alignItems: "center",
               }}
@@ -516,7 +504,7 @@ export default function TransactionForm() {
               <T
                 variant="body"
                 style={{
-                  color: colors.expense,
+                  color: theme.expense,
                   textTransform: "uppercase",
                   fontSize: 14,
                 }}
@@ -554,20 +542,20 @@ export default function TransactionForm() {
       />
 
       {/* Category search modal */}
-      <Modal transparent visible={catSearchVisible} animationType="fade" onRequestClose={() => setCatSearchVisible(false)}>
-        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.7)", padding: 24, paddingTop: 80 }}>
-          <View style={{ backgroundColor: colors.background, borderWidth: 2, borderColor: "#1A1A1A", padding: 16, flex: 1 }}>
+      <Modal transparent visible={catSearchVisible} animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={() => setCatSearchVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: theme.backdrop, padding: 24, paddingTop: 80 }}>
+          <View style={{ backgroundColor: theme.background, borderWidth: 2, borderColor: theme.border, padding: 16, flex: 1 }}>
             <View style={{ flexDirection: "row", marginBottom: 16 }}>
               <TextInput
-                style={{ flex: 1, backgroundColor: "#0A0A0A", borderWidth: 2, borderColor: "#555", color: "#F5F1E8", paddingHorizontal: 14, paddingVertical: 0, fontSize: 15, fontFamily: "IBMPlexMono", height: 44, textAlignVertical: "center", includeFontPadding: false }}
+                style={modalSearchStyle}
                 placeholder="Search"
-                placeholderTextColor="#333"
+                placeholderTextColor={theme.placeholder}
                 value={catSearchQuery}
                 onChangeText={setCatSearchQuery}
                 autoFocus
               />
-              <TouchableOpacity onPress={() => setCatSearchVisible(false)} style={{ borderWidth: 2, borderColor: colors.muted, paddingHorizontal: 14, justifyContent: "center", marginLeft: 8 }}>
-                <T variant="body" style={{ color: colors.muted, fontSize: 14, textTransform: "uppercase" }}>Close</T>
+              <TouchableOpacity onPress={() => setCatSearchVisible(false)} style={{ borderWidth: 2, borderColor: theme.muted, paddingHorizontal: 14, justifyContent: "center", marginLeft: 8 }}>
+                <T variant="body" style={{ color: theme.muted, fontSize: 14, textTransform: "uppercase" }}>Close</T>
               </TouchableOpacity>
             </View>
             <ScrollView>
@@ -575,11 +563,11 @@ export default function TransactionForm() {
                 <TouchableOpacity
                   key={c.id}
                   onPress={() => { setCategoryId(c.id); setCatSearchVisible(false); setCatSearchQuery(""); }}
-                  style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: "#1A1A1A" }}
+                  style={{ flexDirection: "row", alignItems: "center", paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: theme.border }}
                 >
-                  <View style={{ width: 12, height: 12, backgroundColor: c.color ?? colors.muted, marginRight: 12 }} />
-                  <T variant="body" style={{ fontSize: 16, color: categoryId === c.id ? colors.accent : colors.ink }}>{c.name}</T>
-                  {categoryId === c.id && <T variant="label" style={{ color: colors.accent, marginLeft: 8 }}>✓</T>}
+                  <View style={{ width: 12, height: 12, backgroundColor: c.color ?? theme.muted, marginRight: 12 }} />
+                  <T variant="body" style={{ fontSize: 16, color: categoryId === c.id ? theme.accent : theme.ink }}>{c.name}</T>
+                  {categoryId === c.id && <T variant="label" style={{ color: theme.accent, marginLeft: 8 }}>✓</T>}
                 </TouchableOpacity>
               ))}
             </ScrollView>
@@ -588,26 +576,4 @@ export default function TransactionForm() {
       </Modal>
     </View>
   );
-}
-
-const inputStyle = {
-  backgroundColor: "#0A0A0A",
-  borderWidth: 2,
-  borderColor: "#555555",
-  color: "#F5F1E8",
-  paddingHorizontal: 14,
-  paddingVertical: 14,
-  fontSize: 15,
-  fontFamily: "IBMPlexMono",
-};
-
-function chipStyle(active: boolean) {
-  return {
-    borderWidth: 2,
-    borderColor: active ? colors.accent : colors.muted,
-    backgroundColor: active ? colors.accent : "transparent",
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    marginRight: 8,
-  };
 }

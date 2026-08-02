@@ -1,6 +1,6 @@
 import { Modal, View, TouchableOpacity } from "react-native";
 import { T } from "@/components/ThemedText";
-import { colors } from "@/theme/colors";
+import { useTheme } from "@/theme/store";
 
 interface Props {
   visible: boolean;
@@ -10,17 +10,18 @@ interface Props {
 }
 
 export function ThemedAlert({ visible, title, message, onDismiss }: Props) {
+  const theme = useTheme();
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onDismiss}>
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.7)", padding: 24 }}>
-        <View style={{ backgroundColor: colors.background, borderWidth: 2, borderColor: "#1A1A1A", padding: 24, width: "100%", maxWidth: 320 }}>
+    <Modal transparent visible={visible} animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={onDismiss}>
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: theme.backdrop, padding: 24 }}>
+        <View style={{ backgroundColor: theme.background, borderWidth: 2, borderColor: theme.border, padding: 24, width: "100%", maxWidth: 320 }}>
           <T variant="heading" style={{ fontSize: 18, marginBottom: 12 }}>{title}</T>
-          <T variant="body" style={{ color: colors.muted, fontSize: 14, marginBottom: 24 }}>{message}</T>
+          <T variant="body" style={{ color: theme.muted, fontSize: 14, marginBottom: 24 }}>{message}</T>
           <TouchableOpacity
             onPress={onDismiss}
-            style={{ borderWidth: 2, borderColor: colors.accent, backgroundColor: colors.accent, paddingVertical: 12, alignItems: "center" }}
+            style={{ borderWidth: 2, borderColor: theme.accent, backgroundColor: theme.accent, paddingVertical: 12, alignItems: "center" }}
           >
-            <T variant="body" style={{ color: colors.background, fontSize: 14, textTransform: "uppercase", fontWeight: "700" }}>OK</T>
+            <T variant="body" style={{ color: theme.background, fontSize: 14, textTransform: "uppercase", fontWeight: "700" }}>OK</T>
           </TouchableOpacity>
         </View>
       </View>
@@ -40,21 +41,22 @@ interface ConfirmProps {
 }
 
 export function ThemedConfirm({ visible, title, message, confirmLabel = "Confirm", cancelLabel = "Cancel", destructive, onConfirm, onCancel }: ConfirmProps) {
+  const theme = useTheme();
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onCancel}>
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.7)", padding: 24 }}>
-        <View style={{ backgroundColor: colors.background, borderWidth: 2, borderColor: "#1A1A1A", padding: 24, width: "100%", maxWidth: 320 }}>
+    <Modal transparent visible={visible} animationType="fade" statusBarTranslucent navigationBarTranslucent onRequestClose={onCancel}>
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: theme.backdrop, padding: 24 }}>
+        <View style={{ backgroundColor: theme.background, borderWidth: 2, borderColor: theme.border, padding: 24, width: "100%", maxWidth: 320 }}>
           <T variant="heading" style={{ fontSize: 18, marginBottom: 12 }}>{title}</T>
-          <T variant="body" style={{ color: colors.muted, fontSize: 14, marginBottom: 24 }}>{message}</T>
+          <T variant="body" style={{ color: theme.muted, fontSize: 14, marginBottom: 24 }}>{message}</T>
           <View style={{ flexDirection: "row", gap: 8 }}>
-            <TouchableOpacity onPress={onCancel} style={{ flex: 1, borderWidth: 2, borderColor: colors.muted, paddingVertical: 12, alignItems: "center" }}>
-              <T variant="body" style={{ color: colors.muted, fontSize: 14, textTransform: "uppercase" }}>{cancelLabel}</T>
+            <TouchableOpacity onPress={onCancel} style={{ flex: 1, borderWidth: 2, borderColor: theme.muted, paddingVertical: 12, alignItems: "center" }}>
+              <T variant="body" style={{ color: theme.muted, fontSize: 14, textTransform: "uppercase" }}>{cancelLabel}</T>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={onConfirm}
-              style={{ flex: 1, borderWidth: 2, borderColor: destructive ? colors.expense : colors.accent, backgroundColor: destructive ? colors.expense : colors.accent, paddingVertical: 12, alignItems: "center" }}
+              style={{ flex: 1, borderWidth: 2, borderColor: destructive ? theme.expense : theme.accent, backgroundColor: destructive ? theme.expense : theme.accent, paddingVertical: 12, alignItems: "center" }}
             >
-              <T variant="body" style={{ color: colors.background, fontSize: 14, textTransform: "uppercase", fontWeight: "700" }}>{confirmLabel}</T>
+              <T variant="body" style={{ color: theme.background, fontSize: 14, textTransform: "uppercase", fontWeight: "700" }}>{confirmLabel}</T>
             </TouchableOpacity>
           </View>
         </View>
